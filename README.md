@@ -4,12 +4,12 @@ Production-grade wholesale **and** retail ERP for an agricultural-input business
 (seeds, fertilizers, pesticides, machines, spare parts, tools). Modular monolith:
 one FastAPI backend + one PostgreSQL database, one Next.js frontend.
 
-> **Status: Phases 0–6 + pricing engine — complete and verified on real Postgres.**
-> Auth/RBAC, the append-only inventory ledger with FEFO + reservations, the
-> pricing/tax engine, purchases (PO → goods receipt → landed cost → stock),
-> retail POS (sale → pricing → FEFO deduction → immutable invoice → payment,
-> idempotent), and wholesale (order → credit check → reservation → dispatch →
-> invoice) are implemented and tested. See
+> **Status: all phases 0–9 + pricing engine implemented and verified on real
+> Postgres** (87 backend tests, ruff + mypy strict clean, 8 migrations zero-drift).
+> The full buy→stock→sell→collect→service spine works end to end for retail and
+> wholesale, with double-entry accounting, machine service, reporting, and
+> hardening (rate limiting, concurrency-safe stock + numbering, backup/DR).
+> Deferred sub-items and the frontend UI beyond auth are listed under
 > [Implementation phases](#implementation-phases).
 
 Branding (name, logo, colours, address, invoice details) is configurable and not
@@ -106,10 +106,11 @@ dev — the backend refuses to start in `production` with the insecure default.
 Run locally and passing:
 
 - **Backend** — `ruff` ✓, `ruff format --check` ✓, `mypy app` (strict) ✓,
-  `pytest` ✓ (**73 tests**: unit + Hypothesis property tests + integration
-  against a real PostgreSQL database), 5 Alembic migrations apply from scratch
-  with **zero drift** (`alembic check`), demo seed runs, and the auth flow was
-  smoke-tested end-to-end over HTTP (login → session cookie → `/me`).
+  `pytest` ✓ (**87 tests**: unit + Hypothesis property tests + integration
+  against a real PostgreSQL database, incl. a two-writer concurrency test),
+  8 Alembic migrations apply from scratch (47 tables) with **zero drift**
+  (`alembic check`), demo seed runs, and the auth flow was smoke-tested
+  end-to-end over HTTP (login → session cookie → `/me`).
 - **Frontend** — `prettier --check` ✓, `next lint` ✓, `tsc --noEmit` ✓,
   `vitest` ✓ (3/3), `next build` ✓.
 
@@ -145,17 +146,24 @@ rather than fail; unit/property tests always run.
 | 3     | Suppliers, purchase orders, goods receipt (posts to stock ledger), landed cost, branch document numbering, duplicate-invoice detection | **Done** |
 | 4     | Retail POS: customers, sale → pricing engine → FEFO stock deduction → immutable invoice (pricing snapshot) → split payments, idempotency keys, walk-in-must-pay rule | **Done** (offline queue pending) |
 | 5     | Wholesale: sales orders/quotations, dealer/wholesale pricing, credit-limit check + approval override, FEFO stock reservation, dispatch → release → deduct → wholesale credit invoice | **Done** (partial dispatch/e-way-bill pending) |
-| 6     | Accounting & collections                          | Planned  |
-| 7     | Machines & service                                | Planned  |
-| 8     | Reports & compliance                              | Planned  |
-| 9     | Hardening (security, perf, DR, a11y)              | Planned  |
+| 6     | Accounting & collections: double-entry ledger (balanced journals), chart of accounts, FIFO payment allocation across invoices, customer ledger | **Done** |
+| 7     | Machines & service: warranties + claims, repair jobs, spare-part consumption/return posted to the stock ledger, warranty-covered billing | **Done** |
+| 8     | Reports & compliance: owner dashboard + GST summary (tax register), documents metadata, in-app notifications | **Done** (Excel/PDF export, more registers pending) |
+| 9     | Hardening: login rate limiting, concurrency-safe stock + document numbering (advisory lock), backup/restore scripts, security & release checklists | **Done** (RLS, 2FA, perf load tests pending) |
+
+### Deferred sub-items (backend tested where noted; not yet built)
+Offline POS queue · partial dispatch / e-way-bill · thermal/A4 invoice printing ·
+Excel/PDF report export · PostgreSQL RLS · 2FA · malware-scan on upload ·
+**frontend screens beyond auth/dashboard/status** (all business flows above are
+implemented and tested at the API/service layer; their React UIs are pending).
 
 ## Documentation
 
 - Architecture decisions: [`docs/adr/`](docs/adr/)
-- More guides (API, permission matrix, deployment, backup/restore, offline sync,
-  security checklist, user manual) are added alongside the phases that introduce
-  those subsystems.
+- Security checklist: [`docs/SECURITY.md`](docs/SECURITY.md)
+- Production release checklist: [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)
+- Backup/restore: [`scripts/backup_db.sh`](scripts/backup_db.sh),
+  [`scripts/restore_db.sh`](scripts/restore_db.sh)
 
 ## License
 
