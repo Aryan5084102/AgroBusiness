@@ -68,7 +68,7 @@ class InventoryRepository:
         return balance
 
     async def batch_availability(
-        self, *, warehouse_id: uuid.UUID, product_id: uuid.UUID
+        self, *, warehouse_id: uuid.UUID, product_id: uuid.UUID, lock: bool = True
     ) -> list[BatchAvailability]:
         stmt = (
             select(StockBalance, Batch.expiry_date)
@@ -78,8 +78,10 @@ class InventoryRepository:
                 StockBalance.product_id == product_id,
                 StockBalance.on_hand > StockBalance.reserved,
             )
-            .with_for_update(of=StockBalance)
         )
+        # Lock rows during a mutation (issue/reserve); read-only for quotes/reports.
+        if lock:
+            stmt = stmt.with_for_update(of=StockBalance)
         rows = await self._session.execute(stmt)
         return [
             BatchAvailability(

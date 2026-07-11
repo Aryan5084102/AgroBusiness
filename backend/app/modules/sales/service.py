@@ -68,12 +68,95 @@ class SaleResult:
     warnings: list[str] = field(default_factory=list)
 
 
+@dataclass
+class QuoteLine:
+    product_id: uuid.UUID
+    name: str
+    quantity: Decimal
+    unit_price: Decimal
+    price_source: str
+    net_amount: Decimal
+    tax_amount: Decimal
+    line_total: Decimal
+    available_stock: Decimal
+
+
+@dataclass
+class QuoteResult:
+    lines: list[QuoteLine]
+    subtotal: Decimal
+    tax_total: Decimal
+    grand_total: Decimal
+    warnings: list[str] = field(default_factory=list)
+
+
 class SalesService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._numbering = NumberingService(session)
         self._inventory = InventoryService(session)
         self._idempotency = IdempotencyService(session)
+
+    async def quote(
+        self,
+        *,
+        organization_id: uuid.UUID,
+        warehouse_id: uuid.UUID,
+        lines: list[SaleLineInput],
+        as_of: date | None = None,
+    ) -> QuoteResult:
+        """Price a cart authoritatively (read-only) with per-line available stock.
+
+        The POS shows these exact figures so the payment amount matches what
+        ``create_retail_invoice`` will compute at finalization. No stock is moved.
+        """
+        products = await self._load_products(organization_id, [ln.product_id for ln in lines])
+        out_lines: list[QuoteLine] = []
+        subtotal = Decimal("0.00")
+        tax_total = Decimal("0.00")
+        grand_total = Decimal("0.00")
+        warnings: list[str] = []
+
+        for line in lines:
+            product = products[line.product_id]
+            priced = price_line(
+                PriceInput(
+                    quantity=line.base_quantity,
+                    retail_price=product.retail_price,
+                    mrp=product.mrp,
+                    wholesale_price=product.wholesale_price,
+                    gst_percent=product.gst_rate,
+                    discount_percent=line.discount_percent,
+                )
+            )
+            warnings.extend(priced.warnings)
+            available = await self._inventory.available(
+                warehouse_id=warehouse_id, product_id=line.product_id, as_of=as_of
+            )
+            out_lines.append(
+                QuoteLine(
+                    product_id=line.product_id,
+                    name=product.name,
+                    quantity=line.base_quantity,
+                    unit_price=priced.unit_price,
+                    price_source=priced.source.value,
+                    net_amount=priced.net_amount,
+                    tax_amount=priced.tax_amount,
+                    line_total=priced.total_amount,
+                    available_stock=available,
+                )
+            )
+            subtotal += priced.net_amount
+            tax_total += priced.tax_amount
+            grand_total += priced.total_amount
+
+        return QuoteResult(
+            lines=out_lines,
+            subtotal=Money(subtotal),
+            tax_total=Money(tax_total),
+            grand_total=Money(grand_total),
+            warnings=warnings,
+        )
 
     async def create_retail_invoice(
         self,

@@ -9,6 +9,7 @@ from app.modules.auth.api import router as auth_router
 from app.modules.catalogue.api import router as products_router
 from app.modules.collections.api import router as collections_router
 from app.modules.notifications.api import router as notifications_router
+from app.modules.organizations.api import router as organizations_router
 from app.modules.reports.api import router as reports_router
 from app.modules.sales.api import router as pos_router
 from app.modules.sales.wholesale_api import router as wholesale_router
@@ -26,3 +27,4 @@ api_router.include_router(wholesale_router, prefix="/wholesale")
 api_router.include_router(collections_router, prefix="/collections")
 api_router.include_router(reports_router, prefix="/reports")
 api_router.include_router(notifications_router, prefix="/notifications")
+api_router.include_router(organizations_router, prefix="/org")

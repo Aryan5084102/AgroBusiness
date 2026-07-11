@@ -51,6 +51,59 @@ class InvoiceResponse(BaseModel):
     warnings: list[str]
 
 
+class QuoteRequest(BaseModel):
+    warehouse_id: uuid.UUID
+    lines: list[SaleLineBody] = Field(min_length=1)
+
+
+class QuoteLineOut(BaseModel):
+    product_id: uuid.UUID
+    name: str
+    quantity: Decimal
+    unit_price: Decimal
+    price_source: str
+    net_amount: Decimal
+    tax_amount: Decimal
+    line_total: Decimal
+    available_stock: Decimal
+
+
+class QuoteResponse(BaseModel):
+    lines: list[QuoteLineOut]
+    subtotal: Decimal
+    tax_total: Decimal
+    grand_total: Decimal
+    warnings: list[str]
+
+
+@router.post("/quote", response_model=QuoteResponse)
+async def quote(
+    payload: QuoteRequest,
+    user: CurrentUser = Depends(require_permission("sales.create")),
+    session: AsyncSession = Depends(db_session),
+) -> QuoteResponse:
+    result = await SalesService(session).quote(
+        organization_id=user.organization_id,
+        warehouse_id=payload.warehouse_id,
+        lines=[
+            SaleLineInput(
+                product_id=ln.product_id,
+                base_quantity=ln.base_quantity,
+                discount_percent=ln.discount_percent,
+            )
+            for ln in payload.lines
+        ],
+        as_of=date.today(),
+    )
+    return QuoteResponse(
+        lines=[QuoteLineOut(**ln.__dict__) for ln in result.lines],
+        subtotal=result.subtotal,
+        tax_total=result.tax_total,
+        grand_total=result.grand_total,
+        warnings=result.warnings,
+    )
+
+
 @router.post("/invoices", response_model=InvoiceResponse, status_code=201)
 async def create_invoice(
     payload: CreateInvoiceRequest,

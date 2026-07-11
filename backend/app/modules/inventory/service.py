@@ -127,6 +127,27 @@ class InventoryService:
             **kwargs,  # type: ignore[arg-type]
         )
 
+    async def available(
+        self,
+        *,
+        warehouse_id: uuid.UUID,
+        product_id: uuid.UUID,
+        as_of: date | None = None,
+    ) -> Decimal:
+        """Sellable quantity now: sum of non-expired (on_hand - reserved) per batch."""
+        as_of = as_of or datetime.now(tz=timezone.utc).date()
+        rows = await self._repo.batch_availability(
+            warehouse_id=warehouse_id, product_id=product_id, lock=False
+        )
+        return sum(
+            (
+                b.available
+                for b in rows
+                if b.available > 0 and (b.expiry_date is None or b.expiry_date > as_of)
+            ),
+            Decimal("0"),
+        )
+
     async def issue_fefo(
         self,
         *,
