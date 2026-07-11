@@ -11,6 +11,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { href: '/dashboard', labelKey: 'nav.dashboard', permission: null },
   { href: '/sales', labelKey: 'nav.sales', permission: 'sales.create' },
+  { href: '/wholesale', labelKey: 'nav.wholesale', permission: 'sales.create' },
   { href: '/purchases', labelKey: 'nav.purchases', permission: 'purchase.view' },
   { href: '/products', labelKey: 'nav.products', permission: 'product.view' },
   { href: '/inventory', labelKey: 'nav.inventory', permission: 'inventory.view' },

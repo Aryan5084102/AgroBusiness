@@ -1,0 +1,124 @@
+@use '@/styles/abstracts/mixins' as m;
+
+.layout {
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: 1fr;
+
+  @include m.desktop-up {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.listCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.search {
+  height: 40px;
+  max-width: 360px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th,
+  td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+  th {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+  }
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.name {
+  font-weight: 600;
+  display: block;
+}
+.code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.type {
+  text-transform: capitalize;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.num {
+  text-align: right;
+}
+.negative {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.formCol {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  height: fit-content;
+}
+.formTitle {
+  font-size: 15px;
+  margin-bottom: var(--space-4);
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+
+  input,
+  select {
+    height: 40px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-weight: 400;
+    color: var(--color-text-primary);
+    background: var(--color-surface);
+  }
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  padding: var(--space-6);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.error {
+  color: var(--color-danger);
+  font-size: 13px;
+}
