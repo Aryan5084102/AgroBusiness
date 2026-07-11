@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/Button';
 import { ApiError } from '@/lib/api/client';
 import { createTranslator, defaultLocale } from '@/lib/i18n';
+import { DemoAccounts } from './DemoAccounts';
 import { useLogin } from './useAuth';
 import { loginSchema, type LoginInput } from './schema';
 import styles from './LoginForm.module.scss';
@@ -23,12 +24,13 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginInput>({ defaultValues: { email: '', password: '' } });
 
-  const onSubmit = async (values: LoginInput) => {
+  const doLogin = async (email: string, password: string) => {
     setFormError(null);
-    const parsed = loginSchema.safeParse(values);
+    const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) return;
     try {
       await loginMutation.mutateAsync(parsed.data);
@@ -41,6 +43,15 @@ export function LoginForm() {
           : 'Unable to sign in right now. Please try again.',
       );
     }
+  };
+
+  const onSubmit = (values: LoginInput) => doLogin(values.email, values.password);
+
+  const onPickDemo = (email: string, password: string) => {
+    // Reflect the choice in the inputs, then sign in.
+    setValue('email', email);
+    setValue('password', password);
+    void doLogin(email, password);
   };
 
   return (
@@ -88,6 +99,8 @@ export function LoginForm() {
           {formError}
         </p>
       ) : null}
+
+      <DemoAccounts onPick={onPickDemo} disabled={loginMutation.isPending} />
     </form>
   );
 }

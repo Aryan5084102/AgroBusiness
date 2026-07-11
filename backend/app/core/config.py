@@ -7,10 +7,10 @@ fail fast at startup rather than surfacing as runtime errors later.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, PostgresDsn, RedisDsn, TypeAdapter, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Validate DSN shape at load time while keeping the stored type as ``str`` for
 # ergonomic use with SQLAlchemy / redis clients.
@@ -48,7 +48,11 @@ class Settings(BaseSettings):
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 14  # 14 days
 
     # --- CORS -------------------------------------------------------------
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    # NoDecode: keep pydantic-settings from JSON-decoding the env value so a
+    # plain comma-separated string works (handled by ``_split_cors`` below).
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:3000"]
+    )
 
     # --- Object storage ---------------------------------------------------
     s3_endpoint_url: str = "http://localhost:9000"
