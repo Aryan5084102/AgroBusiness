@@ -4,11 +4,11 @@ Production-grade wholesale **and** retail ERP for an agricultural-input business
 (seeds, fertilizers, pesticides, machines, spare parts, tools). Modular monolith:
 one FastAPI backend + one PostgreSQL database, one Next.js frontend.
 
-> **Status: Phases 0–3 + pricing engine — complete and verified on real Postgres.**
+> **Status: Phases 0–4 + pricing engine — complete and verified on real Postgres.**
 > Auth/RBAC, the append-only inventory ledger with FEFO, the pricing/tax engine,
-> and purchases (PO → goods receipt → landed cost → stock) are implemented and
-> tested. Later phases add remaining business modules. See
-> [Implementation phases](#implementation-phases).
+> purchases (PO → goods receipt → landed cost → stock), and retail POS (sale →
+> pricing → FEFO deduction → immutable invoice → payment, idempotent) are
+> implemented and tested. See [Implementation phases](#implementation-phases).
 
 Branding (name, logo, colours, address, invoice details) is configurable and not
 hardcoded in source.
@@ -103,9 +103,9 @@ dev — the backend refuses to start in `production` with the insecure default.
 
 Run locally and passing:
 
-- **Backend** — `ruff` ✓, `ruff format --check` ✓, `mypy app` (strict, 68 files) ✓,
-  `pytest` ✓ (**64 tests**: unit + Hypothesis property tests + integration
-  against a real PostgreSQL database), 3 Alembic migrations apply from scratch
+- **Backend** — `ruff` ✓, `ruff format --check` ✓, `mypy app` (strict) ✓,
+  `pytest` ✓ (**68 tests**: unit + Hypothesis property tests + integration
+  against a real PostgreSQL database), 4 Alembic migrations apply from scratch
   with **zero drift** (`alembic check`), demo seed runs, and the auth flow was
   smoke-tested end-to-end over HTTP (login → session cookie → `/me`).
 - **Frontend** — `prettier --check` ✓, `next lint` ✓, `tsc --noEmit` ✓,
@@ -141,7 +141,7 @@ rather than fail; unit/property tests always run.
 | 2     | Catalogue (products + JSONB attrs, units), append-only stock ledger, balances, batches/serials, FEFO issue, transfer, negative-stock + expiry guards | **Done** |
 | —     | Centralised pricing engine + GST tax (priority resolution, decimal-safe totals, margin/discount warnings) | **Done** |
 | 3     | Suppliers, purchase orders, goods receipt (posts to stock ledger), landed cost, branch document numbering, duplicate-invoice detection | **Done** |
-| 4     | Retail POS + offline                              | Planned  |
+| 4     | Retail POS: customers, sale → pricing engine → FEFO stock deduction → immutable invoice (pricing snapshot) → split payments, idempotency keys, walk-in-must-pay rule | **Done** (offline queue pending) |
 | 5     | Wholesale                                         | Planned  |
 | 6     | Accounting & collections                          | Planned  |
 | 7     | Machines & service                                | Planned  |
