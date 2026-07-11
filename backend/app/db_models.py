@@ -17,8 +17,10 @@ from app.modules.payments import models as payment_models
 from app.modules.purchases import models as purchase_models
 from app.modules.sales import models as sales_models
 from app.modules.sales import order_models as sales_order_models
+from app.modules.service_jobs import models as service_job_models
 from app.modules.suppliers import models as supplier_models
 from app.modules.users import models as user_models
+from app.modules.warranties import models as warranty_models
 
 __all__ = [
     "accounting_models",
@@ -34,6 +36,8 @@ __all__ = [
     "purchase_models",
     "sales_models",
     "sales_order_models",
+    "service_job_models",
     "supplier_models",
     "user_models",
+    "warranty_models",
 ]

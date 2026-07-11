@@ -16,7 +16,9 @@ _DEFAULT_PREFIXES = {
     "purchase_invoice": "PINV",
     "sales_invoice": "INV",
     "sales_order": "SO",
+    "quotation": "QTN",
     "payment": "PAY",
+    "repair_job": "JOB",
 }
 
 
