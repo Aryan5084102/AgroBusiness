@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.numbering.models import NumberSequence
+
+
+def _advisory_lock_key(
+    organization_id: uuid.UUID, branch_id: uuid.UUID | None, document_type: str
+) -> int:
+    """Stable 64-bit signed key for a per-scope transaction advisory lock."""
+    raw = f"{organization_id}:{branch_id}:{document_type}".encode()
+    return int.from_bytes(hashlib.md5(raw).digest()[:8], "big", signed=True)
+
 
 # Default prefixes per document type.
 _DEFAULT_PREFIXES = {
@@ -33,7 +43,18 @@ class NumberingService:
         document_type: str,
         branch_id: uuid.UUID | None = None,
     ) -> str:
-        """Issue the next formatted number for a document type (locks the row)."""
+        """Issue the next formatted number for a document type.
+
+        Serialised with a transaction-level advisory lock keyed by
+        (org, branch, document_type). This covers the first-use race where the
+        sequence row does not yet exist (so a plain SELECT FOR UPDATE has nothing
+        to lock), which would otherwise let two concurrent documents share a
+        number. The lock releases automatically at transaction end.
+        """
+        await self._session.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"),
+            {"key": _advisory_lock_key(organization_id, branch_id, document_type)},
+        )
         stmt = (
             select(NumberSequence)
             .where(

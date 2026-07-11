@@ -13,6 +13,7 @@ from app.core.deps import (
     db_session,
     get_current_user,
 )
+from app.core.ratelimit import login_rate_limiter
 from app.modules.auth.schemas import LoginRequest, LoginResponse, UserProfile
 from app.modules.auth.service import AuthService, IssuedTokens
 
@@ -61,6 +62,9 @@ async def login(
     response: Response,
     session: AsyncSession = Depends(db_session),
 ) -> LoginResponse:
+    # Per-IP rate limit on login (complements per-account lockout).
+    client_ip = request.client.host if request.client else "unknown"
+    login_rate_limiter.check(f"login:{client_ip}", limit=10, window_seconds=60)
     service = AuthService(session)
     tokens = await service.authenticate(
         email=payload.email,

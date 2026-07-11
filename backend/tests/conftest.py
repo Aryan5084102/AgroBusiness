@@ -22,6 +22,14 @@ _DEFAULT_TEST_DB = "postgresql+asyncpg://agriflow@127.0.0.1:5433/agriflow_test"
 os.environ.setdefault("DATABASE_URL", os.environ.get("TEST_DATABASE_URL", _DEFAULT_TEST_DB))
 
 
+@pytest.fixture(autouse=True)
+def _reset_login_rate_limiter() -> None:
+    """The login limiter is process-global; reset it so tests don't bleed counts."""
+    from app.core.ratelimit import login_rate_limiter
+
+    login_rate_limiter._buckets.clear()
+
+
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
     """Async HTTP client bound to the ASGI app (no DB required)."""
