@@ -4,6 +4,7 @@ Imported by Alembic's env and by test schema creation. Adding a new module's
 models means adding an import here.
 """
 
+from app.modules.accounting import models as accounting_models
 from app.modules.audit import models as audit_models
 from app.modules.auth import models as auth_models
 from app.modules.catalogue import models as catalogue_models
@@ -20,6 +21,7 @@ from app.modules.suppliers import models as supplier_models
 from app.modules.users import models as user_models
 
 __all__ = [
+    "accounting_models",
     "audit_models",
     "auth_models",
     "catalogue_models",

@@ -4,7 +4,7 @@ Production-grade wholesale **and** retail ERP for an agricultural-input business
 (seeds, fertilizers, pesticides, machines, spare parts, tools). Modular monolith:
 one FastAPI backend + one PostgreSQL database, one Next.js frontend.
 
-> **Status: Phases 0–5 + pricing engine — complete and verified on real Postgres.**
+> **Status: Phases 0–6 + pricing engine — complete and verified on real Postgres.**
 > Auth/RBAC, the append-only inventory ledger with FEFO + reservations, the
 > pricing/tax engine, purchases (PO → goods receipt → landed cost → stock),
 > retail POS (sale → pricing → FEFO deduction → immutable invoice → payment,
