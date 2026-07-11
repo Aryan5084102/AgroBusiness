@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import health
 from app.modules.auth.api import router as auth_router
+from app.modules.catalogue.api import router as products_router
 from app.modules.collections.api import router as collections_router
 from app.modules.notifications.api import router as notifications_router
 from app.modules.reports.api import router as reports_router
@@ -19,6 +20,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth_router, prefix="/auth")
 api_router.include_router(users_router, prefix="/users")
 api_router.include_router(suppliers_router, prefix="/suppliers")
+api_router.include_router(products_router, prefix="/products")
 api_router.include_router(pos_router, prefix="/pos")
 api_router.include_router(wholesale_router, prefix="/wholesale")
 api_router.include_router(collections_router, prefix="/collections")

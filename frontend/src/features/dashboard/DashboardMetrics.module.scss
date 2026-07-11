@@ -12,13 +12,17 @@
   box-shadow: var(--shadow-sm);
 }
 
+.warn {
+  border-color: var(--color-warning);
+}
+
 .label {
   font-size: 13px;
   color: var(--color-text-secondary);
 }
 
 .value {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   margin: var(--space-2) 0;
 }
@@ -26,4 +30,11 @@
 .hint {
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+
+.error {
+  padding: var(--space-6);
+  color: var(--color-danger);
+  border: 1px dashed var(--color-danger);
+  border-radius: var(--radius-lg);
 }

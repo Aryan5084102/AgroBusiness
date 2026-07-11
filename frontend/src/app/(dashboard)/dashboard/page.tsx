@@ -1,31 +1,19 @@
 import { AppShell } from '@/components/layout/AppShell/AppShell';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DashboardMetrics } from '@/features/dashboard/DashboardMetrics';
 import { RequireAuth } from '@/features/auth/RequireAuth';
-import styles from './page.module.scss';
 
-// Authenticated dashboard shell. Real owner metrics (sales, receivables, stock
-// value, alerts) are populated in later phases.
+// Authenticated owner dashboard backed by the reports/dashboard endpoint.
 export default function DashboardPage() {
   return (
     <RequireAuth>
-      <DashboardContent />
+      <AppShell title="Dashboard">
+        <PageHeader
+          title="Today at a glance"
+          description="Live sales, collections, receivables and stock alerts."
+        />
+        <DashboardMetrics />
+      </AppShell>
     </RequireAuth>
-  );
-}
-
-function DashboardContent() {
-  return (
-    <AppShell title="Dashboard">
-      <div className={styles.grid}>
-        {['Today’s sales', 'Receivables', 'Stock value', 'Low-stock items'].map(
-          (label) => (
-            <section key={label} className={styles.card}>
-              <p className={styles.label}>{label}</p>
-              <p className={`${styles.value} tabular-nums`}>—</p>
-              <p className={styles.hint}>Available from Phase 4 onward</p>
-            </section>
-          ),
-        )}
-      </div>
-    </AppShell>
   );
 }
