@@ -1,0 +1,49 @@
+@use '@/styles/abstracts/variables' as v;
+
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--color-primary-forest);
+  color: #fff;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  transition: width 150ms ease;
+}
+
+.collapsed {
+  width: 64px;
+  align-items: center;
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+  padding: var(--space-2) 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.link {
+  display: block;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+}
+
+.active {
+  background: var(--color-action-green);
+  color: #fff;
+}

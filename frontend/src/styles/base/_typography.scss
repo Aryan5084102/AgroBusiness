@@ -1,0 +1,30 @@
+// Typography base. Inter for Latin/numbers, Noto Sans Devanagari for Hindi.
+// Fonts are referenced by family with robust system fallbacks so the build does
+// not depend on a network font fetch. Self-hosted webfonts can be added later.
+:root {
+  --font-sans:
+    'Inter', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-numeric: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-text-primary);
+}
+
+// Tabular figures for prices, quantities and report tables.
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}

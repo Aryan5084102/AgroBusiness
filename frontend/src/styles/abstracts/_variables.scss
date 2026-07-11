@@ -1,0 +1,7 @@
+// Re-export all token partials so feature modules import a single entry point:
+//   @use '@/styles/abstracts/variables' as v;
+@forward '../tokens/colors';
+@forward '../tokens/spacing';
+@forward '../tokens/radius';
+@forward '../tokens/shadows';
+@forward '../tokens/z-index';

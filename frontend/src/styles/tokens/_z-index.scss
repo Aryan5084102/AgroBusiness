@@ -1,0 +1,8 @@
+// Z-index scale to avoid stacking conflicts.
+$z-base: 1;
+$z-sticky: 100;
+$z-sidebar: 200;
+$z-header: 300;
+$z-drawer: 400;
+$z-modal: 500;
+$z-toast: 600;

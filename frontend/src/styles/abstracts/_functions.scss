@@ -1,0 +1,7 @@
+// SCSS helper functions.
+@use 'sass:math';
+
+// Convert a px value to rem (assuming 16px root).
+@function rem($px) {
+  @return math.div($px, 16) * 1rem;
+}

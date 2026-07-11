@@ -1,0 +1,28 @@
+# Node
+node_modules/
+.next/
+coverage/
+playwright-report/
+test-results/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# Env / secrets
+.env
+.env.local
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

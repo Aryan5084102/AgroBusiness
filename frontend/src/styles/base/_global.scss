@@ -1,0 +1,61 @@
+// Emits design tokens as CSS custom properties on :root so components reference
+// them via var(--*). Overriding these variables (e.g. for white-label branding
+// or a future dark theme) requires no source changes.
+@use '../tokens/colors' as c;
+@use '../tokens/spacing' as s;
+@use '../tokens/radius' as r;
+@use '../tokens/shadows' as sh;
+
+:root {
+  // Brand
+  --color-primary-forest: #{c.$color-primary-forest};
+  --color-primary-hover: #{c.$color-primary-hover};
+  --color-action-green: #{c.$color-action-green};
+  --color-action-green-hover: #{c.$color-action-green-hover};
+  --color-amber: #{c.$color-amber};
+  --color-amber-light: #{c.$color-amber-light};
+
+  // Surfaces
+  --color-bg-main: #{c.$color-bg-main};
+  --color-bg-secondary: #{c.$color-bg-secondary};
+  --color-surface: #{c.$color-surface};
+
+  // Text & lines
+  --color-text-primary: #{c.$color-text-primary};
+  --color-text-secondary: #{c.$color-text-secondary};
+  --color-border: #{c.$color-border};
+
+  // Status
+  --color-success: #{c.$color-success};
+  --color-warning: #{c.$color-warning};
+  --color-danger: #{c.$color-danger};
+  --color-info: #{c.$color-info};
+
+  // Spacing
+  --space-1: #{s.$space-1};
+  --space-2: #{s.$space-2};
+  --space-3: #{s.$space-3};
+  --space-4: #{s.$space-4};
+  --space-5: #{s.$space-5};
+  --space-6: #{s.$space-6};
+  --space-8: #{s.$space-8};
+
+  // Radius
+  --radius-sm: #{r.$radius-sm};
+  --radius-md: #{r.$radius-md};
+  --radius-lg: #{r.$radius-lg};
+
+  // Shadows
+  --shadow-sm: #{sh.$shadow-sm};
+  --shadow-md: #{sh.$shadow-md};
+  --shadow-lg: #{sh.$shadow-lg};
+}
+
+body {
+  background-color: var(--color-bg-main);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-action-green);
+  outline-offset: 2px;
+}

@@ -1,0 +1,4 @@
+// Global stylesheet entry — imported once in the root layout.
+@use 'base/reset';
+@use 'base/typography';
+@use 'base/global';

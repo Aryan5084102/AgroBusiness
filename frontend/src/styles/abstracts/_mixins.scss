@@ -1,0 +1,30 @@
+// Reusable mixins. Breakpoints follow the tablet/desktop layout rules.
+
+$breakpoint-tablet: 768px;
+$breakpoint-desktop: 1024px;
+$breakpoint-wide: 1440px;
+
+@mixin tablet-up {
+  @media (min-width: $breakpoint-tablet) {
+    @content;
+  }
+}
+
+@mixin desktop-up {
+  @media (min-width: $breakpoint-desktop) {
+    @content;
+  }
+}
+
+// Accessible focus ring — always visible, meets WCAG focus-visible guidance.
+@mixin focus-ring {
+  outline: 2px solid var(--color-action-green);
+  outline-offset: 2px;
+}
+
+// Respect reduced-motion preferences.
+@mixin motion-safe {
+  @media (prefers-reduced-motion: no-preference) {
+    @content;
+  }
+}

@@ -1,0 +1,63 @@
+@use '@/styles/abstracts/mixins' as m;
+
+.layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+
+  @include m.desktop-up {
+    grid-template-columns: 1.1fr 1fr;
+  }
+}
+
+.brandPanel {
+  display: none;
+  background: linear-gradient(
+    155deg,
+    var(--color-primary-forest),
+    var(--color-primary-hover)
+  );
+  color: #fff;
+  padding: var(--space-8);
+
+  @include m.desktop-up {
+    display: flex;
+    align-items: flex-end;
+  }
+}
+
+.brandInner {
+  max-width: 420px;
+}
+
+.logo {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin-top: var(--space-3);
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+.formPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-8) var(--space-4);
+  background: var(--color-surface);
+}
+
+.statusLink {
+  font-size: 13px;
+  color: var(--color-action-green);
+  font-weight: 600;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
