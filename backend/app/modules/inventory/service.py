@@ -169,6 +169,69 @@ class InventoryService:
             )
         return posted
 
+    async def reserve(
+        self,
+        *,
+        organization_id: uuid.UUID,
+        warehouse_id: uuid.UUID,
+        product_id: uuid.UUID,
+        base_quantity: Decimal,
+        as_of: date | None = None,
+    ) -> None:
+        """Reserve available stock (FEFO) by increasing ``reserved`` per batch.
+
+        Does not move stock — it makes it unavailable to other orders. Raises when
+        available (on_hand - reserved) cannot cover the request.
+        """
+        if base_quantity <= 0:
+            raise BusinessRuleError("Reservation quantity must be positive.")
+        as_of = as_of or datetime.now(tz=timezone.utc).date()
+        availability = await self._repo.batch_availability(
+            warehouse_id=warehouse_id, product_id=product_id
+        )
+        try:
+            allocations = allocate_fefo(availability, base_quantity, as_of=as_of)
+        except InsufficientStockError as exc:
+            raise BusinessRuleError(str(exc), code="insufficient_stock_to_reserve") from exc
+        for alloc in allocations:
+            await self._repo.adjust_reserved(
+                warehouse_id=warehouse_id,
+                product_id=product_id,
+                batch_id=alloc.batch_id,
+                delta=alloc.quantity,
+            )
+
+    async def release_reservation(
+        self,
+        *,
+        warehouse_id: uuid.UUID,
+        product_id: uuid.UUID,
+        base_quantity: Decimal,
+    ) -> None:
+        """Release a previously-made reservation (earliest-expiry batches first)."""
+        if base_quantity <= 0:
+            raise BusinessRuleError("Release quantity must be positive.")
+        reserved = await self._repo.reserved_balances(
+            warehouse_id=warehouse_id, product_id=product_id
+        )
+        remaining = base_quantity
+        for bal in sorted(
+            reserved,
+            key=lambda b: (b.expiry_date is None, b.expiry_date or date.max),
+        ):
+            if remaining <= 0:
+                break
+            take = min(bal.available, remaining)
+            await self._repo.adjust_reserved(
+                warehouse_id=warehouse_id,
+                product_id=product_id,
+                batch_id=bal.batch_id,
+                delta=-take,
+            )
+            remaining -= take
+        if remaining > 0:
+            raise BusinessRuleError("Release exceeds the reserved quantity.", code="over_release")
+
     async def transfer(
         self,
         *,

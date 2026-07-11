@@ -89,3 +89,41 @@ class InventoryRepository:
             )
             for balance, expiry in rows.all()
         ]
+
+    async def adjust_reserved(
+        self,
+        *,
+        warehouse_id: uuid.UUID,
+        product_id: uuid.UUID,
+        batch_id: uuid.UUID | None,
+        delta: Decimal,
+    ) -> None:
+        balance = await self.get_balance(
+            warehouse_id=warehouse_id, product_id=product_id, batch_id=batch_id
+        )
+        if balance is None:
+            raise ValueError("Cannot adjust reservation on a missing balance row.")
+        balance.reserved = balance.reserved + delta
+        await self._session.flush()
+
+    async def reserved_balances(
+        self, *, warehouse_id: uuid.UUID, product_id: uuid.UUID
+    ) -> list[BatchAvailability]:
+        """Balances that currently hold a reservation, earliest expiry first."""
+        stmt = (
+            select(StockBalance, Batch.expiry_date)
+            .outerjoin(Batch, Batch.id == StockBalance.batch_id)
+            .where(
+                StockBalance.warehouse_id == warehouse_id,
+                StockBalance.product_id == product_id,
+                StockBalance.reserved > 0,
+            )
+            .with_for_update(of=StockBalance)
+        )
+        rows = await self._session.execute(stmt)
+        return [
+            BatchAvailability(
+                batch_id=balance.batch_id, expiry_date=expiry, available=balance.reserved
+            )
+            for balance, expiry in rows.all()
+        ]

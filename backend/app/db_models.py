@@ -15,6 +15,7 @@ from app.modules.organizations import models as org_models
 from app.modules.payments import models as payment_models
 from app.modules.purchases import models as purchase_models
 from app.modules.sales import models as sales_models
+from app.modules.sales import order_models as sales_order_models
 from app.modules.suppliers import models as supplier_models
 from app.modules.users import models as user_models
 
@@ -30,6 +31,7 @@ __all__ = [
     "payment_models",
     "purchase_models",
     "sales_models",
+    "sales_order_models",
     "supplier_models",
     "user_models",
 ]
