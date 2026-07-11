@@ -9,8 +9,10 @@ from app.modules.audit import models as audit_models
 from app.modules.auth import models as auth_models
 from app.modules.catalogue import models as catalogue_models
 from app.modules.customers import models as customer_models
+from app.modules.documents import models as document_models
 from app.modules.idempotency import models as idempotency_models
 from app.modules.inventory import models as inventory_models
+from app.modules.notifications import models as notification_models
 from app.modules.numbering import models as numbering_models
 from app.modules.organizations import models as org_models
 from app.modules.payments import models as payment_models
@@ -28,8 +30,10 @@ __all__ = [
     "auth_models",
     "catalogue_models",
     "customer_models",
+    "document_models",
     "idempotency_models",
     "inventory_models",
+    "notification_models",
     "numbering_models",
     "org_models",
     "payment_models",
