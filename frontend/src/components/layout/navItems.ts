@@ -16,6 +16,7 @@ export const navItems: NavItem[] = [
   { href: '/products', labelKey: 'nav.products', permission: 'product.view' },
   { href: '/inventory', labelKey: 'nav.inventory', permission: 'inventory.view' },
   { href: '/customers', labelKey: 'nav.customers', permission: 'customer.view' },
+  { href: '/collections', labelKey: 'nav.collections', permission: 'payment.receive' },
   { href: '/reports', labelKey: 'nav.reports', permission: 'report.view' },
   { href: '/settings', labelKey: 'nav.settings', permission: 'user.manage' },
 ];
