@@ -11,6 +11,7 @@ from app.modules.collections.api import router as collections_router
 from app.modules.customers.api import router as customers_router
 from app.modules.notifications.api import router as notifications_router
 from app.modules.organizations.api import router as organizations_router
+from app.modules.purchases.api import router as purchases_router
 from app.modules.reports.api import router as reports_router
 from app.modules.sales.api import router as pos_router
 from app.modules.sales.wholesale_api import router as wholesale_router
@@ -22,6 +23,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth_router, prefix="/auth")
 api_router.include_router(users_router, prefix="/users")
 api_router.include_router(suppliers_router, prefix="/suppliers")
+api_router.include_router(purchases_router, prefix="/purchases")
 api_router.include_router(products_router, prefix="/products")
 api_router.include_router(customers_router, prefix="/customers")
 api_router.include_router(pos_router, prefix="/pos")
