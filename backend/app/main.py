@@ -43,6 +43,20 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # A deployed service whose only allowed origins are local ones is nearly
+    # always a forgotten CORS_ORIGINS. It fails invisibly: the browser drops the
+    # response, the frontend reports a generic network error, and the server
+    # logs a perfectly ordinary request. Say so at startup instead.
+    if settings.environment in ("staging", "production") and all(
+        "localhost" in origin or "127.0.0.1" in origin for origin in settings.cors_origins
+    ):
+        get_logger("startup").warning(
+            "cors_origins_look_local",
+            cors_origins=settings.cors_origins,
+            environment=settings.environment,
+            hint="Set CORS_ORIGINS to the frontend's origin, or browsers will block every request.",
+        )
+
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
