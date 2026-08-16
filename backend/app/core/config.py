@@ -53,6 +53,16 @@ class Settings(BaseSettings):
     login_rate_limit: int = Field(default=60, ge=1)
     login_rate_window_seconds: int = Field(default=60, ge=1)
 
+    # --- Auth cookies -----------------------------------------------------
+    # Same-origin deployments (frontend proxied under the API's hostname) keep
+    # the "lax" default. A frontend on its own domain — Vercel, Netlify, a
+    # second Render service — is a cross-site caller, and browsers only attach
+    # cookies to those requests when SameSite=None, which they in turn only
+    # accept on Secure cookies. ``cookie_secure`` overrides the derived value
+    # for the rare case of a non-HTTPS staging host.
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    cookie_secure: bool | None = None
+
     # --- CORS -------------------------------------------------------------
     # NoDecode: keep pydantic-settings from JSON-decoding the env value so a
     # plain comma-separated string works (handled by ``_split_cors`` below).
@@ -70,6 +80,14 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _validate_database_url(cls, value: str) -> str:
+        # Managed hosts (Render, Heroku, Fly) hand out `postgres://` or
+        # `postgresql://` URLs. Both are valid DSNs but neither selects an async
+        # driver, so SQLAlchemy would fail later with an opaque dialect error.
+        # Normalise here so a copy-pasted connection string just works.
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                value = "postgresql+asyncpg://" + value[len(prefix) :]
+                break
         _postgres_adapter.validate_python(value)
         return value
 
@@ -91,10 +109,25 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment == "production"
 
+    @property
+    def auth_cookie_secure(self) -> bool:
+        """Whether auth cookies carry the ``Secure`` attribute.
+
+        SameSite=None is meaningless without it — browsers drop such cookies
+        outright — so it is forced on there regardless of environment.
+        """
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.cookie_samesite == "none" or self.is_production
+
     def enforce_production_safety(self) -> None:
         """Reject insecure defaults when running in production."""
         if self.is_production and self.secret_key == "dev-insecure-change-me":
             raise RuntimeError("SECRET_KEY must be set to a strong value in production.")
+        # Browsers reject SameSite=None cookies that are not Secure, which would
+        # break every login with no server-side error to show for it.
+        if self.cookie_samesite == "none" and not self.auth_cookie_secure:
+            raise RuntimeError("COOKIE_SAMESITE=none requires COOKIE_SECURE=true (HTTPS).")
 
 
 @lru_cache

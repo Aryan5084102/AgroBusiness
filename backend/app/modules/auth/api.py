@@ -22,14 +22,15 @@ router = APIRouter(tags=["auth"])
 
 def _set_auth_cookies(response: Response, tokens: IssuedTokens) -> None:
     settings = get_settings()
-    secure = settings.is_production
+    secure = settings.auth_cookie_secure
+    samesite = settings.cookie_samesite
     response.set_cookie(
         ACCESS_COOKIE,
         tokens.access_token,
         max_age=settings.access_token_ttl_seconds,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite=samesite,
         path="/",
     )
     response.set_cookie(
@@ -38,7 +39,7 @@ def _set_auth_cookies(response: Response, tokens: IssuedTokens) -> None:
         max_age=settings.refresh_token_ttl_seconds,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite=samesite,
         path="/",
     )
 
@@ -115,8 +116,17 @@ async def logout(
     service = AuthService(session)
     await service.logout(raw_refresh_token=request.cookies.get(REFRESH_COOKIE))
     await session.commit()
-    response.delete_cookie(ACCESS_COOKIE, path="/")
-    response.delete_cookie(REFRESH_COOKIE, path="/")
+    # The clearing Set-Cookie must repeat the original attributes, or the
+    # browser rejects it and the session survives logout on cross-site setups.
+    settings = get_settings()
+    for name in (ACCESS_COOKIE, REFRESH_COOKIE):
+        response.delete_cookie(
+            name,
+            path="/",
+            httponly=True,
+            secure=settings.auth_cookie_secure,
+            samesite=settings.cookie_samesite,
+        )
     response.status_code = 204
     return response
 
