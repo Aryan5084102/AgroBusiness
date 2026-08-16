@@ -1,101 +1,175 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { DataTable } from '@/components/ui/DataTable';
+import { FieldRow, Input } from '@/components/ui/Field';
+import { Modal } from '@/components/ui/Modal';
+import { QueryState } from '@/components/feedback/QueryState';
+import { useToast } from '@/components/ui/Toast';
+import { usePermissions } from '@/features/auth/usePermissions';
 import { ApiError } from '@/lib/api/client';
+import type { Supplier } from './api';
 import { useCreateSupplier, useSuppliers } from './useSuppliers';
 import styles from './SuppliersPanel.module.scss';
 
-interface FormValues {
-  code: string;
-  name: string;
-  phone: string;
+/** The supplier book. Adding one requires `purchase.create` — the same
+ * permission as booking a delivery in. */
+export function SuppliersPanel() {
+  const { can } = usePermissions();
+  const suppliers = useSuppliers();
+  const [creating, setCreating] = useState(false);
+
+  return (
+    <>
+      <Card>
+        <CardHeader
+          title="Suppliers"
+          description="Who you buy from. Duplicate supplier invoices are rejected automatically."
+          actions={
+            can('purchase.create') ? (
+              <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
+                Add supplier
+              </Button>
+            ) : null
+          }
+        />
+        <QueryState
+          isLoading={suppliers.isLoading}
+          error={suppliers.error}
+          onRetry={suppliers.refetch}
+          loadingHeight={200}
+        >
+          <DataTable<Supplier>
+            rows={suppliers.data ?? []}
+            rowKey={(row) => row.id}
+            emptyTitle="No suppliers yet"
+            emptyDescription="Add the businesses you buy stock from."
+            emptyAction={
+              can('purchase.create') ? (
+                <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
+                  Add supplier
+                </Button>
+              ) : null
+            }
+            columns={[
+              {
+                key: 'name',
+                header: 'Supplier',
+                render: (row) => (
+                  <span className={styles.primaryCell}>
+                    <span>{row.name}</span>
+                    <span className={styles.muted}>{row.code}</span>
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (row) =>
+                  row.is_active ? (
+                    <Badge tone="success" dot>
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral" dot>
+                      Inactive
+                    </Badge>
+                  ),
+              },
+            ]}
+          />
+        </QueryState>
+      </Card>
+
+      <NewSupplierDialog open={creating} onClose={() => setCreating(false)} />
+    </>
+  );
 }
 
-// Suppliers list with an inline create form. Server errors are mapped, never raw.
-export function SuppliersPanel() {
-  const { data, isLoading, isError } = useSuppliers();
+function NewSupplierDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const toast = useToast();
   const createSupplier = useCreateSupplier();
-  const [formError, setFormError] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FormValues>({ defaultValues: { code: '', name: '', phone: '' } });
+  const [form, setForm] = useState({ code: '', name: '', phone: '', gstin: '' });
+  const [error, setError] = useState<string | null>(null);
 
-  const onSubmit = async (values: FormValues) => {
-    setFormError(null);
+  const submit = async () => {
+    setError(null);
+    if (!form.code.trim() || !form.name.trim()) {
+      setError('A code and a name are both required.');
+      return;
+    }
     try {
       await createSupplier.mutateAsync({
-        code: values.code.trim(),
-        name: values.name.trim(),
-        phone: values.phone.trim() || undefined,
+        code: form.code.trim(),
+        name: form.name.trim(),
+        phone: form.phone.trim() || undefined,
+        gstin: form.gstin.trim() || undefined,
       });
-      reset();
+      toast.success('Supplier added');
+      setForm({ code: '', name: '', phone: '', gstin: '' });
+      onClose();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Could not create supplier.');
+      setError(
+        err instanceof ApiError ? err.message : 'The supplier could not be saved.',
+      );
     }
   };
 
   return (
-    <div className={styles.layout}>
-      <section className={styles.listCol}>
-        {isError ? (
-          <p role="alert" className={styles.error}>
-            Could not load suppliers.
-          </p>
-        ) : isLoading ? (
-          <p className={styles.muted}>Loading…</p>
-        ) : (data?.length ?? 0) === 0 ? (
-          <p className={styles.empty}>No suppliers yet. Add your first on the right.</p>
-        ) : (
-          <ul role="list" className={styles.list}>
-            {data?.map((s) => (
-              <li key={s.id} className={styles.row}>
-                <span className={styles.code}>{s.code}</span>
-                <span className={styles.name}>{s.name}</span>
-                <span className={s.is_active ? styles.active : styles.inactive}>
-                  {s.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <aside className={styles.formCol}>
-        <h3 className={styles.formTitle}>Add supplier</h3>
-        <form onSubmit={handleSubmit(onSubmit)} className={styles.form} noValidate>
-          <label className={styles.field}>
-            <span>Code</span>
-            <input
-              {...register('code', { required: true })}
-              aria-invalid={!!errors.code}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Name</span>
-            <input
-              {...register('name', { required: true })}
-              aria-invalid={!!errors.name}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Phone (optional)</span>
-            <input {...register('phone')} />
-          </label>
-          <Button type="submit" isLoading={createSupplier.isPending}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Add a supplier"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={submit} isLoading={createSupplier.isPending}>
             Save supplier
           </Button>
-          {formError ? (
-            <p role="alert" className={styles.error}>
-              {formError}
-            </p>
-          ) : null}
-        </form>
-      </aside>
-    </div>
+        </>
+      }
+    >
+      <div className={styles.form}>
+        <FieldRow>
+          <Input
+            label="Code"
+            required
+            value={form.code}
+            hint="e.g. SUP-IFFCO"
+            onChange={(event) =>
+              setForm({ ...form, code: event.target.value.toUpperCase() })
+            }
+          />
+          <Input
+            label="Name"
+            required
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+          />
+        </FieldRow>
+        <FieldRow>
+          <Input
+            label="Phone"
+            value={form.phone}
+            onChange={(event) => setForm({ ...form, phone: event.target.value })}
+          />
+          <Input
+            label="GSTIN"
+            value={form.gstin}
+            onChange={(event) => setForm({ ...form, gstin: event.target.value })}
+          />
+        </FieldRow>
+        {error ? (
+          <p role="alert" className={styles.error}>
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </Modal>
   );
 }

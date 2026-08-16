@@ -7,11 +7,11 @@ import { ProductsTable } from '@/features/products/ProductsTable';
 
 export default function ProductsPage() {
   return (
-    <RequireAuth>
+    <RequireAuth permissions={['product.view']}>
       <AppShell title="Products">
         <PageHeader
           title="Products"
-          description="Catalogue of seeds, fertilizers, pesticides, machines and spares."
+          description="Your catalogue of seeds, fertilizers, pesticides, machines, spares and tools."
         />
         <ProductsTable />
       </AppShell>

@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.numbering.models import NumberSequence
+from app.modules.organizations.models import Branch
 
 
 def _advisory_lock_key(
@@ -74,7 +75,7 @@ class NumberingService:
                 organization_id=organization_id,
                 branch_id=branch_id,
                 document_type=document_type,
-                prefix=_DEFAULT_PREFIXES.get(document_type, document_type.upper()[:6]),
+                prefix=await self._prefix_for(document_type, branch_id),
                 next_value=1,
             )
             self._session.add(seq)
@@ -84,3 +85,20 @@ class NumberingService:
         seq.next_value = value + 1
         await self._session.flush()
         return f"{seq.prefix}-{value:0{seq.padding}d}"
+
+    async def _prefix_for(self, document_type: str, branch_id: uuid.UUID | None) -> str:
+        """Build a prefix that keeps numbers unique across the organization.
+
+        Sequences count per branch, but document numbers are unique per *org*
+        (that is what a tax authority expects to see). Without the branch code in
+        the prefix, the second branch's first invoice would collide with the
+        first branch's — so branch-scoped sequences carry the branch code.
+        """
+        base = _DEFAULT_PREFIXES.get(document_type, document_type.upper()[:6])
+        if branch_id is None:
+            return base
+        branch = await self._session.get(Branch, branch_id)
+        if branch is None:
+            return base
+        # Keep within the column's 20 chars: e.g. "MAIN-INV".
+        return f"{branch.code[:11]}-{base}"

@@ -1,143 +1,194 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Badge, humanize } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { ApiError } from '@/lib/api/client';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { DataTable } from '@/components/ui/DataTable';
+import { QueryState } from '@/components/feedback/QueryState';
+import { SearchInput, Toolbar, ToolbarSpacer } from '@/components/ui/Toolbar';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
+import { usePermissions } from '@/features/auth/usePermissions';
 import { formatCurrency } from '@/lib/formatting/currency';
-import type { CustomerType } from './api';
-import { useCreateCustomer, useCustomers } from './useCustomers';
+import { CustomerDialog } from './CustomerDialog';
+import type { Customer } from './api';
+import { useCustomers } from './useCustomers';
 import styles from './CustomersPanel.module.scss';
 
-const TYPES: CustomerType[] = ['farmer', 'retail', 'retailer', 'dealer', 'distributor'];
-
-interface FormValues {
-  code: string;
-  name: string;
-  customer_type: CustomerType;
-  credit_limit: string;
-}
-
-// Customer list (with credit + outstanding) and an inline create form.
+/** Customer book with live credit exposure. Clicking a row opens their details
+ * so a dealer's limit can be adjusted without leaving the list. */
 export function CustomersPanel() {
+  const { can } = usePermissions();
   const [search, setSearch] = useState('');
-  const { data, isLoading, isError } = useCustomers(search || undefined);
-  const createCustomer = useCreateCustomer();
-  const [formError, setFormError] = useState<string | null>(null);
-  const { register, handleSubmit, reset } = useForm<FormValues>({
-    defaultValues: { code: '', name: '', customer_type: 'dealer', credit_limit: '0' },
-  });
+  const [editing, setEditing] = useState<Customer | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  const onSubmit = async (values: FormValues) => {
-    setFormError(null);
-    try {
-      await createCustomer.mutateAsync({
-        code: values.code.trim(),
-        name: values.name.trim(),
-        customer_type: values.customer_type,
-        credit_limit: values.credit_limit || '0',
-      });
-      reset();
-    } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Could not create customer.');
-    }
-  };
+  const customers = useCustomers({ search: search || undefined });
+  const rows = customers.data ?? [];
+  const canCreate = can('customer.create');
+
+  const totalOutstanding = rows.reduce((sum, row) => sum + Number(row.outstanding), 0);
+  const overLimit = rows.filter((row) => Number(row.available_credit) < 0).length;
 
   return (
-    <div className={styles.layout}>
-      <section className={styles.listCol}>
-        <input
-          type="search"
-          className={styles.search}
-          placeholder="Search by name or code…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search customers"
+    <>
+      <StatGrid>
+        <StatCard
+          label="Customers"
+          icon="customers"
+          isLoading={customers.isLoading}
+          value={rows.length}
+          hint="Matching the current search"
         />
-        {isError ? (
-          <p role="alert" className={styles.error}>
-            Could not load customers.
-          </p>
-        ) : isLoading ? (
-          <p className={styles.muted}>Loading…</p>
-        ) : (data?.length ?? 0) === 0 ? (
-          <p className={styles.muted}>No customers found.</p>
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th className={styles.num}>Credit limit</th>
-                  <th className={styles.num}>Outstanding</th>
-                  <th className={styles.num}>Available</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <span className={styles.name}>{c.name}</span>
-                      <span className={styles.code}>{c.code}</span>
-                    </td>
-                    <td className={styles.type}>{c.customer_type.replace('_', ' ')}</td>
-                    <td className={`${styles.num} tabular-nums`}>
-                      {formatCurrency(c.credit_limit)}
-                    </td>
-                    <td className={`${styles.num} tabular-nums`}>
-                      {formatCurrency(c.outstanding)}
-                    </td>
-                    <td
-                      className={`${styles.num} tabular-nums ${
-                        Number(c.available_credit) < 0 ? styles.negative : ''
-                      }`}
-                    >
-                      {formatCurrency(c.available_credit)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+        <StatCard
+          label="Total outstanding"
+          icon="collections"
+          tone={totalOutstanding > 0 ? 'warning' : 'default'}
+          isLoading={customers.isLoading}
+          value={formatCurrency(totalOutstanding)}
+          hint="Owed across all listed customers"
+        />
+        <StatCard
+          label="Over their limit"
+          icon="alert"
+          tone={overLimit > 0 ? 'danger' : 'positive'}
+          isLoading={customers.isLoading}
+          value={overLimit}
+          hint="Further credit sales need an override"
+        />
+      </StatGrid>
 
-      <aside className={styles.formCol}>
-        <h3 className={styles.formTitle}>Add customer</h3>
-        <form onSubmit={handleSubmit(onSubmit)} className={styles.form} noValidate>
-          <label className={styles.field}>
-            <span>Code</span>
-            <input {...register('code', { required: true })} />
-          </label>
-          <label className={styles.field}>
-            <span>Name</span>
-            <input {...register('name', { required: true })} />
-          </label>
-          <label className={styles.field}>
-            <span>Type</span>
-            <select {...register('customer_type')}>
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span>Credit limit (₹)</span>
-            <input type="number" min={0} step="0.01" {...register('credit_limit')} />
-          </label>
-          <Button type="submit" isLoading={createCustomer.isPending}>
-            Save customer
-          </Button>
-          {formError ? (
-            <p role="alert" className={styles.error}>
-              {formError}
-            </p>
-          ) : null}
-        </form>
-      </aside>
-    </div>
+      <Card>
+        <CardHeader
+          title="Customers & dealers"
+          description="Walk-ins, farmers, retailers and dealers. Credit limits are enforced when a wholesale order is confirmed."
+          actions={
+            canCreate ? (
+              <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
+                Add customer
+              </Button>
+            ) : null
+          }
+        />
+        <Toolbar>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search by name or code…"
+          />
+          <ToolbarSpacer />
+        </Toolbar>
+
+        <QueryState
+          isLoading={customers.isLoading}
+          error={customers.error}
+          onRetry={customers.refetch}
+          loadingHeight={280}
+        >
+          <DataTable<Customer>
+            rows={rows}
+            rowKey={(row) => row.id}
+            onRowClick={canCreate ? (row) => setEditing(row) : undefined}
+            emptyTitle="No customers found"
+            emptyDescription={
+              search
+                ? 'Nothing matches that search.'
+                : 'Add a customer to sell on credit and track their balance.'
+            }
+            emptyAction={
+              canCreate && !search ? (
+                <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
+                  Add customer
+                </Button>
+              ) : null
+            }
+            columns={[
+              {
+                key: 'name',
+                header: 'Customer',
+                render: (row) => (
+                  <span className={styles.primaryCell}>
+                    <span>{row.name}</span>
+                    <span className={styles.muted}>
+                      {row.code}
+                      {row.phone ? ` · ${row.phone}` : ''}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'type',
+                header: 'Type',
+                render: (row) => (
+                  <Badge tone="neutral">{humanize(row.customer_type)}</Badge>
+                ),
+              },
+              {
+                key: 'limit',
+                header: 'Credit limit',
+                numeric: true,
+                secondary: true,
+                render: (row) =>
+                  Number(row.credit_limit) > 0 ? formatCurrency(row.credit_limit) : '—',
+              },
+              {
+                key: 'outstanding',
+                header: 'Outstanding',
+                numeric: true,
+                render: (row) =>
+                  Number(row.outstanding) > 0 ? (
+                    <span className={styles.due}>{formatCurrency(row.outstanding)}</span>
+                  ) : (
+                    '—'
+                  ),
+              },
+              {
+                key: 'available',
+                header: 'Credit left',
+                numeric: true,
+                render: (row) =>
+                  Number(row.credit_limit) > 0 ? (
+                    <span
+                      className={
+                        Number(row.available_credit) < 0 ? styles.negative : undefined
+                      }
+                    >
+                      {formatCurrency(row.available_credit)}
+                    </span>
+                  ) : (
+                    <span className={styles.muted}>Cash only</span>
+                  ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                secondary: true,
+                render: (row) =>
+                  row.is_active ? (
+                    <Badge tone="success" dot>
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral" dot>
+                      Inactive
+                    </Badge>
+                  ),
+              },
+            ]}
+          />
+        </QueryState>
+      </Card>
+
+      <CustomerDialog
+        open={creating}
+        customer={null}
+        onClose={() => setCreating(false)}
+      />
+      <CustomerDialog
+        open={Boolean(editing)}
+        customer={editing}
+        onClose={() => setEditing(null)}
+      />
+    </>
   );
 }

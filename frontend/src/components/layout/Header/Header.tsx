@@ -1,10 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Icon } from '@/components/ui/Icon';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
-import { useLogout } from '@/features/auth/useAuth';
+import { useLogout, useMe } from '@/features/auth/useAuth';
 import { locales } from '@/lib/i18n';
-import { setLocale, toggleSidebar } from '@/store/uiSlice';
+import { setLocale, setMobileNavOpen } from '@/store/uiSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import styles from './Header.module.scss';
 
@@ -12,12 +14,15 @@ interface HeaderProps {
   title: string;
 }
 
-// Sticky top header: sidebar toggle, page title, locale switch, notifications, logout.
+/** Sticky top bar: mobile nav trigger, page title, language, alerts, account. */
 export function Header({ title }: HeaderProps) {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const locale = useAppSelector((state) => state.ui.locale);
+  const mobileNavOpen = useAppSelector((state) => state.ui.mobileNavOpen);
+  const { data: user } = useMe();
   const logout = useLogout();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const onLogout = async () => {
     await logout.mutateAsync();
@@ -25,15 +30,16 @@ export function Header({ title }: HeaderProps) {
   };
 
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header} no-print`}>
       <div className={styles.left}>
         <button
           type="button"
           className={styles.iconButton}
-          aria-label="Toggle navigation"
-          onClick={() => dispatch(toggleSidebar())}
+          aria-label="Open navigation"
+          aria-expanded={mobileNavOpen}
+          onClick={() => dispatch(setMobileNavOpen(!mobileNavOpen))}
         >
-          ☰
+          <Icon name="menu" size={20} />
         </button>
         <h1 className={styles.title}>{title}</h1>
       </div>
@@ -52,15 +58,51 @@ export function Header({ title }: HeaderProps) {
             </button>
           ))}
         </div>
+
         <NotificationBell />
-        <button
-          type="button"
-          className={styles.logout}
-          onClick={onLogout}
-          disabled={logout.isPending}
-        >
-          Sign out
-        </button>
+
+        <div className={styles.account}>
+          <button
+            type="button"
+            className={styles.accountButton}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <span className={styles.avatar} aria-hidden="true">
+              {(user?.full_name ?? '?').charAt(0).toUpperCase()}
+            </span>
+            <span className={styles.accountName}>{user?.full_name ?? 'Account'}</span>
+            <Icon name="chevronDown" size={14} />
+          </button>
+
+          {menuOpen ? (
+            <>
+              <button
+                type="button"
+                className={styles.menuScrim}
+                aria-label="Close account menu"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div className={styles.menu} role="menu">
+                <div className={styles.menuHeader}>
+                  <p className={styles.menuName}>{user?.full_name}</p>
+                  <p className={styles.menuEmail}>{user?.email}</p>
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.menuItem}
+                  onClick={onLogout}
+                  disabled={logout.isPending}
+                >
+                  <Icon name="logout" size={16} />
+                  {logout.isPending ? 'Signing out…' : 'Sign out'}
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
     </header>
   );

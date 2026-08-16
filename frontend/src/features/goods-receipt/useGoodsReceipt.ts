@@ -13,7 +13,10 @@ export function useCreateGoodsReceipt() {
   return useMutation({
     mutationFn: (input: GoodsReceiptInput) => createGoodsReceipt(input),
     onSuccess: () => {
+      // A receipt adds stock, so every stock-derived view is now stale.
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });

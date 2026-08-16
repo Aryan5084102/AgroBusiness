@@ -14,3 +14,9 @@ export function fetchNotifications(unreadOnly = false): Promise<Notification[]> 
   const params = unreadOnly ? '?unread_only=true' : '';
   return apiFetch<Notification[]>(`/api/v1/notifications${params}`);
 }
+
+export function markNotificationRead(notificationId: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/notifications/${notificationId}/read`, {
+    method: 'POST',
+  });
+}

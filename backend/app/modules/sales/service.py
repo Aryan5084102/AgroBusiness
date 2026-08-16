@@ -23,6 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.money import Money
 from app.core.exceptions import BusinessRuleError, NotFoundError
+from app.modules.accounting.service import (
+    PAYMENT_METHOD_ACCOUNT,
+    AccountingService,
+    JournalLine,
+)
 from app.modules.catalogue.models import Product
 from app.modules.idempotency.service import IdempotencyService
 from app.modules.inventory.models import MovementType
@@ -96,6 +101,7 @@ class SalesService:
         self._numbering = NumberingService(session)
         self._inventory = InventoryService(session)
         self._idempotency = IdempotencyService(session)
+        self._accounting = AccountingService(session)
 
     async def quote(
         self,
@@ -309,6 +315,15 @@ class SalesService:
         invoice.payment_status = self._derive_status(paid_amount, invoice.grand_total)
         await self._session.flush()
 
+        # 6. Post the revenue journal so the books balance without a separate step.
+        await self._post_sale_journal(
+            organization_id=organization_id,
+            invoice=invoice,
+            payments=payments,
+            branch_id=branch_id,
+            created_by=created_by,
+        )
+
         if idempotency_key is not None:
             await self._idempotency.record(
                 organization_id=organization_id,
@@ -325,6 +340,49 @@ class SalesService:
             paid_amount=invoice.paid_amount,
             payment_status=invoice.payment_status,
             warnings=warnings,
+        )
+
+    async def _post_sale_journal(
+        self,
+        *,
+        organization_id: uuid.UUID,
+        invoice: SalesInvoice,
+        payments: list[PaymentInput],
+        branch_id: uuid.UUID | None,
+        created_by: uuid.UUID | None,
+    ) -> None:
+        """Dr cash/bank per tender + Dr AR for the unpaid part, Cr sales + GST.
+
+        Keeping this inside finalization means the ledger can never drift from the
+        invoices: the same transaction either writes both or neither.
+        """
+        if invoice.grand_total <= 0:
+            return
+        lines = [
+            JournalLine(account_code="SALES", credit=Money(invoice.subtotal)),
+        ]
+        if invoice.tax_total > 0:
+            lines.append(JournalLine(account_code="GST_OUTPUT", credit=Money(invoice.tax_total)))
+        for payment in payments:
+            lines.append(
+                JournalLine(
+                    account_code=PAYMENT_METHOD_ACCOUNT.get(payment.method.value, "CASH"),
+                    debit=Money(payment.amount),
+                )
+            )
+        on_credit = Money(invoice.grand_total - invoice.paid_amount)
+        if on_credit > 0:
+            lines.append(JournalLine(account_code="AR", debit=on_credit))
+
+        await self._accounting.post(
+            organization_id=organization_id,
+            entry_date=invoice.invoice_date,
+            lines=lines,
+            narration=f"Retail sale {invoice.invoice_number}",
+            branch_id=branch_id,
+            source_document_type="sales_invoice",
+            source_document_id=invoice.id,
+            created_by=created_by,
         )
 
     @staticmethod

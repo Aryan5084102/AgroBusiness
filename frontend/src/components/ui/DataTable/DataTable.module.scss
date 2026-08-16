@@ -1,0 +1,89 @@
+@use '@/styles/abstracts/mixins' as m;
+
+// Wide tables scroll inside their own container so the page never scrolls sideways.
+.scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.caption {
+  padding: var(--space-3) var(--space-5);
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-bg-subtle);
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover td {
+  background: var(--color-bg-subtle);
+}
+
+.clickable {
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tfoot td,
+.table tfoot th {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border-strong);
+  background: var(--color-bg-subtle);
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+// Secondary columns are noise on a phone; the primary ones still tell the story.
+.secondary {
+  display: none;
+
+  @include m.tablet-up {
+    display: table-cell;
+  }
+}

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.money import Money
 from app.core.exceptions import BusinessRuleError, NotFoundError
+from app.modules.accounting.service import AccountingService, JournalLine
 from app.modules.catalogue.models import Product
 from app.modules.customers.models import Customer
 from app.modules.inventory.models import MovementType
@@ -65,6 +66,7 @@ class WholesaleService:
         self._session = session
         self._numbering = NumberingService(session)
         self._inventory = InventoryService(session)
+        self._accounting = AccountingService(session)
 
     async def customer_outstanding(self, customer_id: uuid.UUID) -> Decimal:
         """Unpaid balance across the customer's non-paid invoices."""
@@ -284,6 +286,28 @@ class WholesaleService:
         order.status = SalesOrderStatus.INVOICED
         order.sales_invoice_id = invoice.id
         await self._session.flush()
+
+        # Wholesale always ships on credit: Dr Accounts Receivable, Cr sales + GST.
+        if invoice.grand_total > 0:
+            lines = [
+                JournalLine(account_code="AR", debit=Money(invoice.grand_total)),
+                JournalLine(account_code="SALES", credit=Money(invoice.subtotal)),
+            ]
+            if invoice.tax_total > 0:
+                lines.append(
+                    JournalLine(account_code="GST_OUTPUT", credit=Money(invoice.tax_total))
+                )
+            await self._accounting.post(
+                organization_id=organization_id,
+                entry_date=invoice.invoice_date,
+                lines=lines,
+                narration=f"Wholesale invoice {invoice.invoice_number}",
+                branch_id=order.branch_id,
+                source_document_type="sales_invoice",
+                source_document_id=invoice.id,
+                created_by=created_by,
+            )
+
         return DispatchResult(
             sales_order_id=order.id,
             sales_invoice_id=invoice.id,

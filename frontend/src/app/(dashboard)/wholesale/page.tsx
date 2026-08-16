@@ -7,10 +7,10 @@ import { WholesaleScreen } from '@/features/wholesale/WholesaleScreen';
 
 export default function WholesalePage() {
   return (
-    <RequireAuth>
-      <AppShell title="Wholesale">
+    <RequireAuth permissions={['sales.create']}>
+      <AppShell title="Wholesale orders">
         <PageHeader
-          title="Wholesale order"
+          title="Wholesale orders"
           description="Create dealer orders with credit control, reserve stock, then dispatch and invoice."
         />
         <WholesaleScreen />

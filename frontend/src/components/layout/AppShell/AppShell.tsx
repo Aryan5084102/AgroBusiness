@@ -17,7 +17,9 @@ export function AppShell({ title, children }: AppShellProps) {
       <Sidebar />
       <div className={styles.main}>
         <Header title={title} />
-        <main className={styles.content}>{children}</main>
+        <main className={styles.content}>
+          <div className={styles.container}>{children}</div>
+        </main>
       </div>
     </div>
   );

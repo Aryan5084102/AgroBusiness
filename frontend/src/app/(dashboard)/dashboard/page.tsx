@@ -1,18 +1,19 @@
+'use client';
+
 import { AppShell } from '@/components/layout/AppShell/AppShell';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { DashboardMetrics } from '@/features/dashboard/DashboardMetrics';
+import { DashboardScreen } from '@/features/dashboard/DashboardScreen';
 import { RequireAuth } from '@/features/auth/RequireAuth';
 
-// Authenticated owner dashboard backed by the reports/dashboard endpoint.
 export default function DashboardPage() {
   return (
     <RequireAuth>
       <AppShell title="Dashboard">
         <PageHeader
           title="Today at a glance"
-          description="Live sales, collections, receivables and stock alerts."
+          description="Everything that needs your attention, tailored to what your role covers."
         />
-        <DashboardMetrics />
+        <DashboardScreen />
       </AppShell>
     </RequireAuth>
   );

@@ -94,7 +94,10 @@ async def test_po_to_grn_increases_stock_with_landed_cost() -> None:
                 )
             ],
         )
-        assert po.po_number.startswith("PO-")
+        # Branch-scoped sequences carry the branch code so numbers stay unique
+        # across the organization: "MAIN-PO-00001".
+        assert po.po_number.endswith("PO-00001")
+        assert "MAIN" in po.po_number
         await session.commit()
         po_id = po.id
 

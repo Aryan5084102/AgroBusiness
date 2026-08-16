@@ -86,7 +86,8 @@ async def test_goods_receipt_increases_stock_with_landed_cost(api: AsyncClient) 
     )
     assert resp.status_code == 201, resp.text
     body = resp.json()
-    assert body["grn_number"].startswith("GRN-")
+    # Branch-scoped sequences prefix the branch code: "MAIN-GRN-00001".
+    assert "GRN-" in body["grn_number"]
     # (100*50 + 500 freight) / 100 = 55.00 landed unit cost.
     assert Decimal(body["landed_unit_costs"][0]["landed_unit_cost"]) == Decimal("55.0000")
 

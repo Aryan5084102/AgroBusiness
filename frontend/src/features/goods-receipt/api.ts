@@ -5,6 +5,7 @@ export interface ReceiptLineInput {
   product_id: string;
   received_base_quantity: string;
   unit_rate: string;
+  free_base_quantity?: string;
   batch_number?: string;
   expiry_date?: string;
 }
@@ -13,6 +14,7 @@ export interface GoodsReceiptInput {
   warehouseId: string;
   supplierId: string;
   freight: string;
+  otherCharges?: string;
   lines: ReceiptLineInput[];
 }
 
@@ -31,6 +33,7 @@ export function createGoodsReceipt(
       warehouse_id: input.warehouseId,
       supplier_id: input.supplierId,
       freight: input.freight || '0',
+      other_charges: input.otherCharges || '0',
       lines: input.lines,
     },
   });

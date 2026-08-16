@@ -62,9 +62,14 @@ async def login(
     response: Response,
     session: AsyncSession = Depends(db_session),
 ) -> LoginResponse:
-    # Per-IP rate limit on login (complements per-account lockout).
+    # Per-IP rate limit on login (complements the per-account lockout).
+    settings = get_settings()
     client_ip = request.client.host if request.client else "unknown"
-    login_rate_limiter.check(f"login:{client_ip}", limit=10, window_seconds=60)
+    login_rate_limiter.check(
+        f"login:{client_ip}",
+        limit=settings.login_rate_limit,
+        window_seconds=settings.login_rate_window_seconds,
+    )
     service = AuthService(session)
     tokens = await service.authenticate(
         email=payload.email,

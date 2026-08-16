@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Field';
+import { defaultRouteFor } from '@/components/layout/navItems';
 import { ApiError } from '@/lib/api/client';
 import { createTranslator, defaultLocale } from '@/lib/i18n';
 import { DemoAccounts } from './DemoAccounts';
@@ -14,8 +16,10 @@ import styles from './LoginForm.module.scss';
 const t = createTranslator(defaultLocale);
 
 /**
- * Login form wired to the backend cookie-based auth. On success the session
- * cookie is set by the server and the user is routed to the dashboard.
+ * Login form wired to the backend's cookie-based auth. On success the session
+ * cookie is set by the server and the user is routed to the first page their
+ * role can actually use — a technician lands in the workshop, not on a
+ * dashboard they have no permission to read.
  */
 export function LoginForm() {
   const router = useRouter();
@@ -31,10 +35,15 @@ export function LoginForm() {
   const doLogin = async (email: string, password: string) => {
     setFormError(null);
     const parsed = loginSchema.safeParse({ email, password });
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      setFormError('Enter a valid email address and your password.');
+      return;
+    }
     try {
-      await loginMutation.mutateAsync(parsed.data);
-      router.push('/dashboard');
+      const result = await loginMutation.mutateAsync(parsed.data);
+      const permissions = new Set(result.user.permissions);
+      const can = (code: string) => result.user.is_owner || permissions.has(code);
+      router.push(defaultRouteFor(can));
     } catch (err) {
       // Never surface raw backend errors; map to a friendly message.
       setFormError(
@@ -56,39 +65,28 @@ export function LoginForm() {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-      <h1 className={styles.title}>{t('auth.signInCta')}</h1>
-
-      <div className={styles.field}>
-        <label htmlFor="email">{t('auth.email')}</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          aria-invalid={Boolean(errors.email)}
-          {...register('email', { required: true })}
-        />
-        {errors.email ? (
-          <span role="alert" className={styles.error}>
-            Email is required
-          </span>
-        ) : null}
+      <div className={styles.heading}>
+        <h2 className={styles.title}>{t('auth.signInCta')}</h2>
+        <p className={styles.subtitle}>
+          Use your work email. Your role decides what you see next.
+        </p>
       </div>
 
-      <div className={styles.field}>
-        <label htmlFor="password">{t('auth.password')}</label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={Boolean(errors.password)}
-          {...register('password', { required: true })}
-        />
-        {errors.password ? (
-          <span role="alert" className={styles.error}>
-            Password is required
-          </span>
-        ) : null}
-      </div>
+      <Input
+        label={t('auth.email')}
+        type="email"
+        autoComplete="email"
+        error={errors.email ? 'Email is required' : undefined}
+        {...register('email', { required: true })}
+      />
+
+      <Input
+        label={t('auth.password')}
+        type="password"
+        autoComplete="current-password"
+        error={errors.password ? 'Password is required' : undefined}
+        {...register('password', { required: true })}
+      />
 
       <Button type="submit" size="lg" isLoading={loginMutation.isPending}>
         {t('auth.signIn')}

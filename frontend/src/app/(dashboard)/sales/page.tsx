@@ -7,11 +7,11 @@ import { RequireAuth } from '@/features/auth/RequireAuth';
 
 export default function SalesPage() {
   return (
-    <RequireAuth>
-      <AppShell title="Retail POS">
+    <RequireAuth permissions={['sales.create']}>
+      <AppShell title="Retail counter">
         <PageHeader
           title="Retail counter"
-          description="Search products, build the cart, take payment. Prices and stock come live from the server."
+          description="Search products, build the bill, take payment. Prices and stock come live from the server."
         />
         <PosScreen />
       </AppShell>

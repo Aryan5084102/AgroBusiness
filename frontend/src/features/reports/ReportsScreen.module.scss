@@ -1,0 +1,17 @@
+.primaryCell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-weight: 600;
+}
+
+.muted {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.low {
+  color: var(--color-danger);
+  font-weight: 650;
+}

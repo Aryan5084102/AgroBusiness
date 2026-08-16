@@ -1,4 +1,4 @@
-// Wholesale feature API: create order (with credit control) and dispatch→invoice.
+// Wholesale feature API: create an order/quotation with credit control.
 import { apiFetch } from '@/lib/api/client';
 import type { CartLine } from '@/features/pos/api';
 
@@ -6,6 +6,7 @@ export interface CreateOrderInput {
   warehouseId: string;
   customerId: string;
   lines: CartLine[];
+  isQuotation?: boolean;
   creditOverrideApproved?: boolean;
 }
 
@@ -17,13 +18,6 @@ export interface OrderResult {
   warnings: string[];
 }
 
-export interface DispatchResult {
-  sales_order_id: string;
-  sales_invoice_id: string;
-  invoice_number: string;
-  grand_total: string;
-}
-
 export function createOrder(input: CreateOrderInput): Promise<OrderResult> {
   return apiFetch<OrderResult>('/api/v1/wholesale/orders', {
     method: 'POST',
@@ -31,14 +25,8 @@ export function createOrder(input: CreateOrderInput): Promise<OrderResult> {
       warehouse_id: input.warehouseId,
       customer_id: input.customerId,
       lines: input.lines,
-      is_quotation: false,
+      is_quotation: input.isQuotation ?? false,
       credit_override_approved: input.creditOverrideApproved ?? false,
     },
-  });
-}
-
-export function dispatchOrder(orderId: string): Promise<DispatchResult> {
-  return apiFetch<DispatchResult>(`/api/v1/wholesale/orders/${orderId}/dispatch`, {
-    method: 'POST',
   });
 }

@@ -1,0 +1,81 @@
+// Permission codes, mirrored from backend `app/core/permissions.py`.
+// The backend enforces these on every route; the frontend uses them only to
+// decide what to render, so a stale copy can never grant real access.
+
+export const PERMISSIONS = {
+  productView: 'product.view',
+  productCreate: 'product.create',
+  productUpdate: 'product.update',
+  pricingViewCost: 'pricing.view_cost',
+  pricingOverride: 'pricing.override',
+  inventoryView: 'inventory.view',
+  inventoryAdjust: 'inventory.adjust',
+  stockTransfer: 'stock.transfer',
+  purchaseView: 'purchase.view',
+  purchaseCreate: 'purchase.create',
+  salesCreate: 'sales.create',
+  salesFinalize: 'sales.finalize',
+  salesCancel: 'sales.cancel',
+  customerView: 'customer.view',
+  customerCreate: 'customer.create',
+  paymentReceive: 'payment.receive',
+  reportView: 'report.view',
+  reportViewProfit: 'report.view_profit',
+  serviceManage: 'service.manage',
+  userManage: 'user.manage',
+  settingsManage: 'settings.manage',
+  auditView: 'audit.view',
+} as const;
+
+export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+// Human labels for the settings > roles matrix.
+export const PERMISSION_LABELS: Record<string, string> = {
+  'product.view': 'View products',
+  'product.create': 'Create products',
+  'product.update': 'Update products',
+  'pricing.view_cost': 'View cost & margin',
+  'pricing.override': 'Override prices',
+  'inventory.view': 'View stock',
+  'inventory.adjust': 'Adjust stock',
+  'stock.transfer': 'Transfer stock',
+  'purchase.view': 'View purchases',
+  'purchase.create': 'Receive purchases',
+  'sales.create': 'Create sales',
+  'sales.finalize': 'Finalize invoices',
+  'sales.cancel': 'Cancel invoices',
+  'customer.view': 'View customers',
+  'customer.create': 'Create customers',
+  'payment.receive': 'Receive payments',
+  'report.view': 'View reports',
+  'report.view_profit': 'View profit & ledgers',
+  'service.manage': 'Manage repair jobs',
+  'user.manage': 'Manage users',
+  'settings.manage': 'Change settings',
+  'audit.view': 'View audit log',
+};
+
+export const PERMISSION_CATEGORIES: Record<string, string> = {
+  'product.view': 'Catalogue',
+  'product.create': 'Catalogue',
+  'product.update': 'Catalogue',
+  'pricing.view_cost': 'Pricing',
+  'pricing.override': 'Pricing',
+  'inventory.view': 'Inventory',
+  'inventory.adjust': 'Inventory',
+  'stock.transfer': 'Inventory',
+  'purchase.view': 'Purchases',
+  'purchase.create': 'Purchases',
+  'sales.create': 'Sales',
+  'sales.finalize': 'Sales',
+  'sales.cancel': 'Sales',
+  'customer.view': 'Customers',
+  'customer.create': 'Customers',
+  'payment.receive': 'Payments',
+  'report.view': 'Reports',
+  'report.view_profit': 'Reports',
+  'service.manage': 'Service',
+  'user.manage': 'Administration',
+  'settings.manage': 'Administration',
+  'audit.view': 'Administration',
+};

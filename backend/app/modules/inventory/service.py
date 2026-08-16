@@ -190,6 +190,77 @@ class InventoryService:
             )
         return posted
 
+    async def adjust(
+        self,
+        *,
+        organization_id: uuid.UUID,
+        warehouse_id: uuid.UUID,
+        product_id: uuid.UUID,
+        signed_quantity: Decimal,
+        movement_type: MovementType,
+        reason: str,
+        branch_id: uuid.UUID | None = None,
+        created_by: uuid.UUID | None = None,
+        as_of: date | None = None,
+    ) -> list[PostedMovement]:
+        """Post a stock correction, taking any reduction from batches FEFO.
+
+        Batch-tracked stock lives on per-batch balance rows, so a bare negative
+        movement against the un-batched row would fail even when the product is
+        clearly on the shelf. Reductions therefore allocate across batches the
+        same way a sale does; additions land on the un-batched row (a specific
+        batch is established when goods are received, not when a count is fixed).
+        """
+        if signed_quantity == 0:
+            raise BusinessRuleError("Adjustment quantity cannot be zero.")
+        direction = movement_direction(movement_type)
+        magnitude = abs(signed_quantity)
+
+        if signed_quantity > 0:
+            if direction < 0:
+                raise BusinessRuleError(
+                    f"{movement_type.value} can only reduce stock.",
+                    code="movement_direction_mismatch",
+                )
+            return [
+                await self.post_movement(
+                    organization_id=organization_id,
+                    warehouse_id=warehouse_id,
+                    product_id=product_id,
+                    movement_type=movement_type,
+                    base_quantity=magnitude,
+                    branch_id=branch_id,
+                    reason=reason,
+                    created_by=created_by,
+                    signed_quantity=magnitude if direction == 0 else None,
+                )
+            ]
+
+        as_of = as_of or datetime.now(tz=timezone.utc).date()
+        availability = await self._repo.batch_availability(
+            warehouse_id=warehouse_id, product_id=product_id
+        )
+        try:
+            allocations = allocate_fefo(availability, magnitude, as_of=as_of)
+        except InsufficientStockError as exc:
+            raise BusinessRuleError(str(exc), code="insufficient_stock") from exc
+
+        return [
+            await self.post_movement(
+                organization_id=organization_id,
+                warehouse_id=warehouse_id,
+                product_id=product_id,
+                movement_type=movement_type,
+                base_quantity=alloc.quantity,
+                batch_id=alloc.batch_id,
+                branch_id=branch_id,
+                reason=reason,
+                created_by=created_by,
+                signed_quantity=-alloc.quantity if direction == 0 else None,
+            )
+            for alloc in allocations
+        ]
+
     async def reserve(
         self,
         *,

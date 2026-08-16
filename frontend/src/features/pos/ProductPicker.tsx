@@ -1,54 +1,87 @@
 'use client';
 
 import { useState } from 'react';
+import { Icon } from '@/components/ui/Icon';
+import { Input } from '@/components/ui/Field';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useProducts } from '@/features/products/useProducts';
 import { formatCurrency } from '@/lib/formatting/currency';
+import { formatQuantity } from '@/lib/formatting/dates';
 import styles from './ProductPicker.module.scss';
 
 interface ProductPickerProps {
   onAdd: (productId: string, name: string) => void;
+  /** Show wholesale rather than retail prices (used by the order builder). */
+  wholesale?: boolean;
 }
 
-// Searchable product list; clicking (or Enter) adds the product to the cart.
-export function ProductPicker({ onAdd }: ProductPickerProps) {
+/** Searchable product list. Clicking (or pressing Enter on) a row adds it. */
+export function ProductPicker({ onAdd, wholesale = false }: ProductPickerProps) {
   const [search, setSearch] = useState('');
-  const { data, isLoading } = useProducts({ search: search || undefined, limit: 12 });
+  const { data, isLoading } = useProducts({
+    search: search || undefined,
+    activeOnly: true,
+    limit: 12,
+  });
   const items = data?.items ?? [];
 
   return (
     <div className={styles.picker}>
-      <input
+      <Input
+        label="Search products"
+        hideLabel
         type="search"
-        className={styles.search}
-        placeholder="Search product by name, SKU or barcode…"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        aria-label="Search products to add"
+        placeholder="Search by name, SKU or barcode…"
+        prefix={<Icon name="search" size={16} />}
         autoFocus
+        onChange={(event) => setSearch(event.target.value)}
       />
-      <ul role="list" className={styles.results}>
-        {isLoading ? (
-          <li className={styles.muted}>Searching…</li>
-        ) : items.length === 0 ? (
-          <li className={styles.muted}>No matching products.</li>
-        ) : (
-          items.map((p) => (
-            <li key={p.id}>
-              <button
-                type="button"
-                className={styles.result}
-                onClick={() => onAdd(p.id, p.name)}
-              >
-                <span className={styles.name}>{p.name}</span>
-                <span className={styles.sku}>{p.sku}</span>
-                <span className={`${styles.price} tabular-nums`}>
-                  {formatCurrency(p.retail_price)}
-                </span>
-              </button>
-            </li>
-          ))
-        )}
-      </ul>
+
+      {isLoading ? (
+        <div className={styles.loading}>
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} height={46} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <p className={styles.muted}>
+          {search ? 'No product matches that search.' : 'No active products yet.'}
+        </p>
+      ) : (
+        <ul role="list" className={styles.results}>
+          {items.map((product) => {
+            const outOfStock = Number(product.on_hand) <= 0;
+            return (
+              <li key={product.id}>
+                <button
+                  type="button"
+                  className={styles.result}
+                  disabled={outOfStock}
+                  onClick={() => onAdd(product.id, product.name)}
+                >
+                  <span className={styles.info}>
+                    <span className={styles.name}>{product.name}</span>
+                    <span className={styles.meta}>
+                      {product.sku}
+                      {outOfStock ? (
+                        <span className={styles.out}> · out of stock</span>
+                      ) : (
+                        ` · ${formatQuantity(product.on_hand)} ${product.unit_code ?? ''} in stock`
+                      )}
+                    </span>
+                  </span>
+                  <span className={`${styles.price} tabular-nums`}>
+                    {formatCurrency(
+                      wholesale ? product.wholesale_price : product.retail_price,
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

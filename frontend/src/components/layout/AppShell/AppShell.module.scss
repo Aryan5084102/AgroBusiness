@@ -1,6 +1,9 @@
+@use '@/styles/abstracts/mixins' as m;
+
 .shell {
   display: flex;
   min-height: 100vh;
+  background: var(--color-bg-main);
 }
 
 .main {
@@ -8,11 +11,23 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--color-bg-main);
 }
 
 .content {
   flex: 1;
-  padding: var(--space-6);
-  overflow-x: auto;
+  padding: var(--space-4);
+
+  @include m.tablet-up {
+    padding: var(--space-6);
+  }
+}
+
+// Caps line length on ultra-wide screens so tables and forms stay scannable.
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
 }

@@ -1,49 +1,250 @@
 @use '@/styles/abstracts/variables' as v;
+@use '@/styles/abstracts/mixins' as m;
 
 .sidebar {
-  width: 240px;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: #{v.$z-sidebar};
+  width: var(--sidebar-width);
   flex-shrink: 0;
-  background: var(--color-primary-forest);
-  color: #fff;
-  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  transition: width 150ms ease;
+  background: var(--color-primary-forest);
+  color: rgba(255, 255, 255, 0.88);
+  transform: translateX(-100%);
+  transition:
+    width 160ms ease,
+    transform 200ms ease;
+
+  // Below tablet the sidebar is an overlay drawer, hidden until opened.
+  @include m.tablet-up {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    transform: none;
+  }
+}
+
+.mobileOpen {
+  transform: translateX(0);
+  box-shadow: var(--shadow-lg);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: #{v.$z-sidebar - 1};
+  background: rgba(12, 26, 21, 0.5);
+  border: none;
+
+  @include m.tablet-up {
+    display: none;
+  }
 }
 
 .collapsed {
-  width: 64px;
-  align-items: center;
+  width: var(--sidebar-width-collapsed);
+
+  .link {
+    justify-content: center;
+    padding: var(--space-3) 0;
+  }
+
+  .brand {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .footer {
+    justify-content: center;
+  }
 }
 
 .brand {
-  font-size: 20px;
-  font-weight: 700;
-  padding: var(--space-2) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--header-height);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
-.list {
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--color-action-green);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brandName {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brandMeta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.group {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
 }
 
-.link {
+.groupLabel {
+  padding: 0 var(--space-3) var(--space-1);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.groupRule {
   display: block;
-  padding: var(--space-3);
+  height: 1px;
+  margin: var(--space-1) var(--space-2);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.78);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.09);
     color: #fff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: -2px;
   }
 }
 
 .active {
   background: var(--color-action-green);
   color: #fff;
+  font-weight: 600;
+
+  &:hover {
+    background: var(--color-action-green);
+  }
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 650;
+  flex-shrink: 0;
+}
+
+.identityText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.identityName {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.identityRole {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.collapse {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  // Collapsing only makes sense where the rail is persistent.
+  @include m.desktop-up {
+    display: inline-flex;
+  }
 }

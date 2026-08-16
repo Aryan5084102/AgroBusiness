@@ -1,0 +1,31 @@
+.primaryCell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-weight: 600;
+}
+
+.muted {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  padding: 0;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    font-size: 12.5px;
+  }
+}
+
+.lineAccount {
+  color: var(--color-text-secondary);
+}

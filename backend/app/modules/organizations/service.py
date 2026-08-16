@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import NotFoundError
 from app.core.permissions import DEFAULT_ROLES, PERMISSIONS
 from app.core.security import hash_password
 from app.modules.organizations.models import Branch, Organization
@@ -128,7 +129,7 @@ class OrganizationProvisioningService:
             .first()
         )
         if role is None:
-            raise ValueError(f"Unknown role: {role_code}")
+            raise NotFoundError(f"Unknown role: {role_code}")
 
         user = User(
             organization_id=organization_id,

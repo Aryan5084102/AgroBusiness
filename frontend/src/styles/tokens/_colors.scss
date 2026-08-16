@@ -2,22 +2,41 @@
 // Single source of truth for brand colours. Consumed by _global.scss to emit
 // CSS custom properties, so themes/branding can be overridden at runtime.
 
-$color-primary-forest: #173f35;
-$color-primary-hover: #0f3028;
-$color-action-green: #2f7d5b;
-$color-action-green-hover: #246548;
-$color-amber: #d99a2b;
-$color-amber-light: #fff4d8;
+// Brand — deep agricultural green, warm amber accent.
+$color-primary-forest: #14362d;
+$color-primary-deep: #0d251f;
+$color-primary-hover: #1c4a3d;
+$color-action-green: #1f7a4d;
+$color-action-green-hover: #196540;
+$color-action-green-soft: #e6f4ec;
+$color-amber: #c98311;
+$color-amber-light: #fdf3e0;
 
-$color-bg-main: #f4f7f5;
+// Surfaces — a hint of green in the page background keeps long shifts easy on
+// the eyes while cards stay pure white so data reads crisply.
+$color-bg-main: #f5f8f6;
 $color-bg-secondary: #eaf0ec;
+$color-bg-subtle: #f0f4f1;
 $color-surface: #ffffff;
+$color-surface-raised: #ffffff;
 
-$color-text-primary: #17211c;
-$color-text-secondary: #5e6d64;
-$color-border: #d8e1db;
+// Text & lines
+$color-text-primary: #14201a;
+$color-text-secondary: #5b6c63;
+$color-text-muted: #8a9992;
+$color-text-inverse: #ffffff;
+$color-border: #dbe4de;
+$color-border-strong: #c3d0c8;
 
-$color-success: #218653;
-$color-warning: #c27a16;
-$color-danger: #c73e3e;
-$color-info: #2774b8;
+// Status — each has a solid tone (text/icon) and a soft tone (background).
+$color-success: #1a7f4b;
+$color-success-soft: #e4f4ea;
+$color-warning: #b8760f;
+$color-warning-soft: #fdf1dc;
+$color-danger: #c33b3b;
+$color-danger-soft: #fbe9e9;
+$color-info: #21689f;
+$color-info-soft: #e5eff8;
+
+// Focus ring — high contrast against both white and forest backgrounds.
+$color-focus: #2f9c68;

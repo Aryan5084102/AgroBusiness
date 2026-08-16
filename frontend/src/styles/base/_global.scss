@@ -9,27 +9,39 @@
 :root {
   // Brand
   --color-primary-forest: #{c.$color-primary-forest};
+  --color-primary-deep: #{c.$color-primary-deep};
   --color-primary-hover: #{c.$color-primary-hover};
   --color-action-green: #{c.$color-action-green};
   --color-action-green-hover: #{c.$color-action-green-hover};
+  --color-action-green-soft: #{c.$color-action-green-soft};
   --color-amber: #{c.$color-amber};
   --color-amber-light: #{c.$color-amber-light};
 
   // Surfaces
   --color-bg-main: #{c.$color-bg-main};
   --color-bg-secondary: #{c.$color-bg-secondary};
+  --color-bg-subtle: #{c.$color-bg-subtle};
   --color-surface: #{c.$color-surface};
+  --color-surface-raised: #{c.$color-surface-raised};
 
   // Text & lines
   --color-text-primary: #{c.$color-text-primary};
   --color-text-secondary: #{c.$color-text-secondary};
+  --color-text-muted: #{c.$color-text-muted};
+  --color-text-inverse: #{c.$color-text-inverse};
   --color-border: #{c.$color-border};
+  --color-border-strong: #{c.$color-border-strong};
 
   // Status
   --color-success: #{c.$color-success};
+  --color-success-soft: #{c.$color-success-soft};
   --color-warning: #{c.$color-warning};
+  --color-warning-soft: #{c.$color-warning-soft};
   --color-danger: #{c.$color-danger};
+  --color-danger-soft: #{c.$color-danger-soft};
   --color-info: #{c.$color-info};
+  --color-info-soft: #{c.$color-info-soft};
+  --color-focus: #{c.$color-focus};
 
   // Spacing
   --space-1: #{s.$space-1};
@@ -39,23 +51,57 @@
   --space-5: #{s.$space-5};
   --space-6: #{s.$space-6};
   --space-8: #{s.$space-8};
+  --space-10: #{s.$space-10};
+  --space-12: #{s.$space-12};
+  --space-16: #{s.$space-16};
 
   // Radius
   --radius-sm: #{r.$radius-sm};
   --radius-md: #{r.$radius-md};
   --radius-lg: #{r.$radius-lg};
+  --radius-xl: #{r.$radius-xl};
+  --radius-pill: #{r.$radius-pill};
 
   // Shadows
   --shadow-sm: #{sh.$shadow-sm};
   --shadow-md: #{sh.$shadow-md};
   --shadow-lg: #{sh.$shadow-lg};
+
+  // Layout constants shared by the shell.
+  --sidebar-width: 248px;
+  --sidebar-width-collapsed: 68px;
+  --header-height: 60px;
 }
 
 body {
   background-color: var(--color-bg-main);
+  color: var(--color-text-primary);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-action-green);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+// Native form controls inherit the app's field styling so ad-hoc selects and
+// inputs never look out of place next to the design-system components.
+select,
+input,
+textarea {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+}
+
+::placeholder {
+  color: var(--color-text-muted);
+}
+
+// Print: strip the app chrome so invoices and reports come out clean.
+@media print {
+  .no-print {
+    display: none !important;
+  }
 }

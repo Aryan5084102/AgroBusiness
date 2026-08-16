@@ -1,19 +1,19 @@
 'use client';
 
 import { AppShell } from '@/components/layout/AppShell/AppShell';
-import { ComingSoon } from '@/components/feedback/ComingSoon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { RequireAuth } from '@/features/auth/RequireAuth';
+import { SettingsScreen } from '@/features/settings/SettingsScreen';
 
 export default function SettingsPage() {
   return (
-    <RequireAuth>
+    <RequireAuth permissions={['user.manage', 'settings.manage']}>
       <AppShell title="Settings">
-        <PageHeader title="Settings" description="Users, roles, branches and branding." />
-        <ComingSoon
-          feature="Organization settings & user management"
-          note="Users, roles and RBAC are implemented and tested (GET/POST /users). The settings UI is being built."
+        <PageHeader
+          title="Settings"
+          description="Business details, staff accounts, roles and your branch/warehouse structure."
         />
+        <SettingsScreen />
       </AppShell>
     </RequireAuth>
   );

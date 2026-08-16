@@ -7,11 +7,11 @@ import { RequireAuth } from '@/features/auth/RequireAuth';
 
 export default function CollectionsPage() {
   return (
-    <RequireAuth>
+    <RequireAuth permissions={['payment.receive']}>
       <AppShell title="Collections">
         <PageHeader
           title="Collections"
-          description="Receive customer payments; the server allocates them across open invoices, oldest first."
+          description="Receive customer payments; the server settles them across open invoices, oldest first."
         />
         <CollectionsScreen />
       </AppShell>

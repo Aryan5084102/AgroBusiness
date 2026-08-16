@@ -1,9 +1,9 @@
 @use '@/styles/abstracts/mixins' as m;
 
 .layout {
-  min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr;
+  min-height: 100vh;
 
   @include m.desktop-up {
     grid-template-columns: 1.1fr 1fr;
@@ -12,34 +12,94 @@
 
 .brandPanel {
   display: none;
-  background: linear-gradient(
-    155deg,
-    var(--color-primary-forest),
-    var(--color-primary-hover)
-  );
+  position: relative;
+  padding: var(--space-12) var(--space-10);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(47, 156, 104, 0.28), transparent 55%),
+    linear-gradient(
+      150deg,
+      var(--color-primary-deep) 0%,
+      var(--color-primary-forest) 100%
+    );
   color: #fff;
-  padding: var(--space-8);
 
   @include m.desktop-up {
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
+    justify-content: space-between;
   }
 }
 
 .brandInner {
-  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 460px;
 }
 
 .logo {
-  font-size: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
+.logoMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--color-action-green);
+}
+
+.headline {
+  font-size: 32px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
 .tagline {
-  margin-top: var(--space-3);
-  font-size: 16px;
-  opacity: 0.85;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  padding: 0;
+  margin-top: var(--space-4);
+}
+
+.point {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.pointIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.brandFooter {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .formPanel {
@@ -47,17 +107,31 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-6);
-  padding: var(--space-8) var(--space-4);
-  background: var(--color-surface);
+  gap: var(--space-5);
+  padding: var(--space-8) var(--space-5);
+  background: var(--color-bg-main);
+}
+
+.mobileBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary-forest);
+
+  @include m.desktop-up {
+    display: none;
+  }
 }
 
 .statusLink {
-  font-size: 13px;
-  color: var(--color-action-green);
+  font-size: 12.5px;
   font-weight: 600;
+  color: var(--color-text-secondary);
 
   &:hover {
+    color: var(--color-action-green);
     text-decoration: underline;
   }
 }

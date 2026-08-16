@@ -1,120 +1,195 @@
 'use client';
 
 import { useState } from 'react';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { DataTable } from '@/components/ui/DataTable';
+import { Select } from '@/components/ui/Field';
+import { Pagination } from '@/components/ui/Pagination';
+import { QueryState } from '@/components/feedback/QueryState';
+import { SearchInput, Toolbar, ToolbarSpacer } from '@/components/ui/Toolbar';
+import { usePermissions } from '@/features/auth/usePermissions';
 import { formatCurrency, formatPercent } from '@/lib/formatting/currency';
-import { useProducts } from './useProducts';
+import { formatQuantity } from '@/lib/formatting/dates';
+import { ProductDialog } from './ProductDialog';
+import type { Product } from './api';
+import { useCategories, useProducts } from './useProducts';
 import styles from './ProductsTable.module.scss';
 
 const PAGE_SIZE = 25;
 
-// Server-paginated, debounced-search product list with loading/empty/error states.
+/** The catalogue: search, filter by category, and (with permission) add or
+ * edit a product. Prices here apply to future sales only — finalized invoices
+ * keep their own snapshot. */
 export function ProductsTable() {
+  const { can } = usePermissions();
   const [search, setSearch] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [offset, setOffset] = useState(0);
-  const { data, isLoading, isError, isFetching } = useProducts({
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const categories = useCategories();
+  const products = useProducts({
     search: search || undefined,
+    categoryId: categoryId || undefined,
     limit: PAGE_SIZE,
     offset,
   });
 
-  const onSearch = (value: string) => {
-    setSearch(value);
-    setOffset(0);
-  };
-
-  const total = data?.total ?? 0;
-  const items = data?.items ?? [];
-  const page = Math.floor(offset / PAGE_SIZE) + 1;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const canEdit = can('product.update');
+  const canCreate = can('product.create');
 
   return (
-    <div>
-      <div className={styles.toolbar}>
-        <input
-          type="search"
-          className={styles.search}
-          placeholder="Search by name, SKU or barcode…"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          aria-label="Search products"
+    <>
+      <Card>
+        <CardHeader
+          title="Catalogue"
+          description="Everything you buy and sell, with its selling prices, tax rate and reorder level."
+          actions={
+            canCreate ? (
+              <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
+                Add product
+              </Button>
+            ) : null
+          }
         />
-        {isFetching ? <span className={styles.fetching}>Updating…</span> : null}
-      </div>
+        <Toolbar>
+          <SearchInput
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setOffset(0);
+            }}
+            placeholder="Search by name, SKU or barcode…"
+          />
+          <Select
+            label="Category"
+            hideLabel
+            value={categoryId}
+            onChange={(event) => {
+              setCategoryId(event.target.value);
+              setOffset(0);
+            }}
+          >
+            <option value="">All categories</option>
+            {(categories.data ?? []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </Select>
+          <ToolbarSpacer />
+        </Toolbar>
 
-      {isError ? (
-        <p role="alert" className={styles.error}>
-          Could not load products. Please try again.
-        </p>
-      ) : null}
-
-      {isLoading ? (
-        <div className={styles.skeleton} aria-hidden="true">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className={styles.skeletonRow} />
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <p className={styles.empty}>No products found.</p>
-      ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>SKU</th>
-                <th className={styles.num}>Retail</th>
-                <th className={styles.num}>Wholesale</th>
-                <th className={styles.num}>GST</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.name}</td>
-                  <td className={styles.mono}>{p.sku}</td>
-                  <td className={`${styles.num} tabular-nums`}>
-                    {formatCurrency(p.retail_price)}
-                  </td>
-                  <td className={`${styles.num} tabular-nums`}>
-                    {formatCurrency(p.wholesale_price)}
-                  </td>
-                  <td className={`${styles.num} tabular-nums`}>
-                    {formatPercent(p.gst_rate)}
-                  </td>
-                  <td>
-                    <span className={p.is_active ? styles.active : styles.inactive}>
-                      {p.is_active ? '● Active' : '○ Inactive'}
+        <QueryState
+          isLoading={products.isLoading}
+          error={products.error}
+          onRetry={products.refetch}
+          loadingHeight={280}
+        >
+          <DataTable<Product>
+            rows={products.data?.items ?? []}
+            rowKey={(row) => row.id}
+            onRowClick={canEdit ? (row) => setEditing(row) : undefined}
+            emptyTitle="No products found"
+            emptyDescription={
+              search
+                ? 'Nothing matches that search. Try a different name or SKU.'
+                : 'Add your first product to start selling.'
+            }
+            emptyAction={
+              canCreate && !search ? (
+                <Button size="sm" icon="plus" onClick={() => setCreating(true)}>
+                  Add product
+                </Button>
+              ) : null
+            }
+            columns={[
+              {
+                key: 'name',
+                header: 'Product',
+                render: (row) => (
+                  <span className={styles.primaryCell}>
+                    <span>{row.name}</span>
+                    <span className={styles.muted}>
+                      {row.sku}
+                      {row.category_name ? ` · ${row.category_name}` : ''}
                     </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  </span>
+                ),
+              },
+              {
+                key: 'stock',
+                header: 'In stock',
+                numeric: true,
+                render: (row) => (
+                  <span
+                    className={
+                      Number(row.min_stock) > 0 &&
+                      Number(row.on_hand) < Number(row.min_stock)
+                        ? styles.low
+                        : undefined
+                    }
+                  >
+                    {formatQuantity(row.on_hand)} {row.unit_code ?? ''}
+                  </span>
+                ),
+              },
+              {
+                key: 'retail',
+                header: 'Retail',
+                numeric: true,
+                render: (row) => formatCurrency(row.retail_price),
+              },
+              {
+                key: 'wholesale',
+                header: 'Wholesale',
+                numeric: true,
+                secondary: true,
+                render: (row) => formatCurrency(row.wholesale_price),
+              },
+              {
+                key: 'gst',
+                header: 'GST',
+                numeric: true,
+                secondary: true,
+                render: (row) => formatPercent(row.gst_rate),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (row) =>
+                  row.is_active ? (
+                    <Badge tone="success" dot>
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral" dot>
+                      Inactive
+                    </Badge>
+                  ),
+              },
+            ]}
+          />
+        </QueryState>
 
-      <div className={styles.pagination}>
-        <span>
-          {total} product{total === 1 ? '' : 's'} · page {page} of {pageCount}
-        </span>
-        <div className={styles.pageButtons}>
-          <button
-            type="button"
-            disabled={offset === 0}
-            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-          >
-            Previous
-          </button>
-          <button
-            type="button"
-            disabled={page >= pageCount}
-            onClick={() => setOffset(offset + PAGE_SIZE)}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-    </div>
+        <Pagination
+          total={products.data?.total ?? 0}
+          limit={PAGE_SIZE}
+          offset={offset}
+          onOffsetChange={setOffset}
+          noun="products"
+        />
+      </Card>
+
+      <ProductDialog open={creating} product={null} onClose={() => setCreating(false)} />
+      <ProductDialog
+        open={Boolean(editing)}
+        product={editing}
+        onClose={() => setEditing(null)}
+      />
+    </>
   );
 }

@@ -7,7 +7,7 @@ collections), the GST summary buckets, and in-app notification create/list/read.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -24,7 +24,9 @@ from app.modules.sales.service import PaymentInput, SaleLineInput, SalesService
 
 pytestmark = pytest.mark.usefixtures("db_ready")
 
-TODAY = date(2026, 7, 11)
+# Payments are stamped by the database clock, so "today" must be the real today
+# for the collections aggregate to line up — a frozen date breaks the day after.
+TODAY = datetime.now(tz=timezone.utc).date()
 
 
 async def _setup_with_sale() -> dict[str, uuid.UUID]:

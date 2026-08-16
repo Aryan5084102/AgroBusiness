@@ -6,18 +6,30 @@ import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import CurrentUser
 from app.core.deps import db_session, require_permission
+from app.core.exceptions import NotFoundError
+from app.modules.catalogue.models import Product
+from app.modules.customers.models import Customer
+from app.modules.organizations.models import Warehouse
 from app.modules.payments.models import PaymentMethod
+from app.modules.sales.models import (
+    PaymentStatus,
+    SaleChannel,
+    SalesInvoice,
+    SalesInvoiceItem,
+)
 from app.modules.sales.service import (
     PaymentInput,
     SaleLineInput,
     SalesService,
 )
+from app.modules.users.models import User
 
 router = APIRouter(tags=["pos"])
 
@@ -76,6 +88,175 @@ class QuoteResponse(BaseModel):
     warnings: list[str]
 
 
+class InvoiceListItem(BaseModel):
+    id: uuid.UUID
+    invoice_number: str
+    invoice_date: date
+    channel: SaleChannel
+    customer_name: str | None
+    warehouse_name: str
+    grand_total: Decimal
+    paid_amount: Decimal
+    outstanding: Decimal
+    payment_status: PaymentStatus
+    created_by_name: str | None
+
+
+class InvoicePage(BaseModel):
+    items: list[InvoiceListItem]
+    total: int
+    limit: int
+    offset: int
+    total_value: Decimal
+
+
+class InvoiceItemOut(BaseModel):
+    product_id: uuid.UUID
+    product_name: str
+    sku: str
+    base_quantity: Decimal
+    unit_price: Decimal
+    price_source: str
+    discount_amount: Decimal
+    taxable_value: Decimal
+    gst_rate: Decimal
+    tax_amount: Decimal
+    line_total: Decimal
+
+
+class InvoiceDetail(InvoiceListItem):
+    subtotal: Decimal
+    discount_total: Decimal
+    tax_total: Decimal
+    customer_id: uuid.UUID | None
+    items: list[InvoiceItemOut]
+
+
+@router.get("/invoices", response_model=InvoicePage)
+async def list_invoices(
+    channel: SaleChannel | None = Query(default=None),
+    customer_id: uuid.UUID | None = Query(default=None),
+    payment_status: PaymentStatus | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    search: str | None = Query(default=None, max_length=60),
+    limit: int = Query(default=25, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    user: CurrentUser = Depends(require_permission("sales.create")),
+    session: AsyncSession = Depends(db_session),
+) -> InvoicePage:
+    """Invoice history, newest first. Finalized invoices are immutable."""
+    base = (
+        select(SalesInvoice, Customer.name, Warehouse.name, User.full_name)
+        .outerjoin(Customer, Customer.id == SalesInvoice.customer_id)
+        .join(Warehouse, Warehouse.id == SalesInvoice.warehouse_id)
+        .outerjoin(User, User.id == SalesInvoice.created_by)
+        .where(SalesInvoice.organization_id == user.organization_id)
+    )
+    if channel is not None:
+        base = base.where(SalesInvoice.channel == channel)
+    if customer_id is not None:
+        base = base.where(SalesInvoice.customer_id == customer_id)
+    if payment_status is not None:
+        base = base.where(SalesInvoice.payment_status == payment_status)
+    if date_from is not None:
+        base = base.where(SalesInvoice.invoice_date >= date_from)
+    if date_to is not None:
+        base = base.where(SalesInvoice.invoice_date <= date_to)
+    if search:
+        base = base.where(SalesInvoice.invoice_number.ilike(f"%{search.strip()}%"))
+
+    subquery = base.subquery()
+    total = await session.scalar(select(func.count()).select_from(subquery))
+    total_value = await session.scalar(select(func.coalesce(func.sum(subquery.c.grand_total), 0)))
+    rows = await session.execute(
+        base.order_by(SalesInvoice.invoice_date.desc(), SalesInvoice.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return InvoicePage(
+        items=[
+            _to_list_item(inv, customer_name, warehouse_name, actor)
+            for inv, customer_name, warehouse_name, actor in rows.all()
+        ],
+        total=int(total or 0),
+        limit=limit,
+        offset=offset,
+        total_value=Decimal(str(total_value or 0)),
+    )
+
+
+def _to_list_item(
+    inv: SalesInvoice, customer_name: str | None, warehouse_name: str, actor: str | None
+) -> InvoiceListItem:
+    return InvoiceListItem(
+        id=inv.id,
+        invoice_number=inv.invoice_number,
+        invoice_date=inv.invoice_date,
+        channel=inv.channel,
+        customer_name=customer_name,
+        warehouse_name=warehouse_name,
+        grand_total=inv.grand_total,
+        paid_amount=inv.paid_amount,
+        outstanding=inv.grand_total - inv.paid_amount,
+        payment_status=inv.payment_status,
+        created_by_name=actor,
+    )
+
+
+@router.get("/invoices/{invoice_id}", response_model=InvoiceDetail)
+async def get_invoice(
+    invoice_id: uuid.UUID,
+    user: CurrentUser = Depends(require_permission("sales.create")),
+    session: AsyncSession = Depends(db_session),
+) -> InvoiceDetail:
+    row = (
+        await session.execute(
+            select(SalesInvoice, Customer.name, Warehouse.name, User.full_name)
+            .outerjoin(Customer, Customer.id == SalesInvoice.customer_id)
+            .join(Warehouse, Warehouse.id == SalesInvoice.warehouse_id)
+            .outerjoin(User, User.id == SalesInvoice.created_by)
+            .where(
+                SalesInvoice.id == invoice_id,
+                SalesInvoice.organization_id == user.organization_id,
+            )
+        )
+    ).first()
+    if row is None:
+        raise NotFoundError("Unknown invoice.")
+    invoice, customer_name, warehouse_name, actor = row
+
+    item_rows = await session.execute(
+        select(SalesInvoiceItem, Product.name, Product.sku)
+        .join(Product, Product.id == SalesInvoiceItem.product_id)
+        .where(SalesInvoiceItem.sales_invoice_id == invoice.id)
+        .order_by(SalesInvoiceItem.created_at)
+    )
+    return InvoiceDetail(
+        **_to_list_item(invoice, customer_name, warehouse_name, actor).model_dump(),
+        subtotal=invoice.subtotal,
+        discount_total=invoice.discount_total,
+        tax_total=invoice.tax_total,
+        customer_id=invoice.customer_id,
+        items=[
+            InvoiceItemOut(
+                product_id=item.product_id,
+                product_name=name,
+                sku=sku,
+                base_quantity=item.base_quantity,
+                unit_price=item.unit_price,
+                price_source=item.price_source,
+                discount_amount=item.discount_amount,
+                taxable_value=item.taxable_value,
+                gst_rate=item.gst_rate,
+                tax_amount=item.tax_amount,
+                line_total=item.line_total,
+            )
+            for item, name, sku in item_rows.all()
+        ],
+    )
+
+
 @router.post("/quote", response_model=QuoteResponse)
 async def quote(
     payload: QuoteRequest,
@@ -129,6 +310,7 @@ async def create_invoice(
             for p in payload.payments
         ],
         customer_id=payload.customer_id,
+        branch_id=user.default_branch_id,
         created_by=user.user_id,
         idempotency_key=idempotency_key,
         as_of=date.today(),

@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     access_token_ttl_seconds: int = 900  # 15 minutes
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 14  # 14 days
 
+    # Per-IP login throttle. A whole shop signs in through one router at opening
+    # time, so this is deliberately generous — brute-force protection comes from
+    # the per-account lockout, which counts failures for a single user.
+    login_rate_limit: int = Field(default=60, ge=1)
+    login_rate_window_seconds: int = Field(default=60, ge=1)
+
     # --- CORS -------------------------------------------------------------
     # NoDecode: keep pydantic-settings from JSON-decoding the env value so a
     # plain comma-separated string works (handled by ``_split_cors`` below).

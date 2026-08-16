@@ -26,3 +26,12 @@ class CurrentUser:
 
     def can_access_branch(self, branch_id: uuid.UUID) -> bool:
         return self.is_owner or branch_id in self.branch_ids
+
+    @property
+    def default_branch_id(self) -> uuid.UUID | None:
+        """The branch documents are stamped with and numbered against.
+
+        Users are assigned to one branch today; when that grows to several, this
+        becomes an explicit picker in the UI rather than an implicit first entry.
+        """
+        return self.branch_ids[0] if self.branch_ids else None

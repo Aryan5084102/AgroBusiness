@@ -7,11 +7,11 @@ import { RequireAuth } from '@/features/auth/RequireAuth';
 
 export default function CustomersPage() {
   return (
-    <RequireAuth>
+    <RequireAuth permissions={['customer.view']}>
       <AppShell title="Customers">
         <PageHeader
           title="Customers & dealers"
-          description="Farmers, retailers and dealers with credit limits and outstanding balances."
+          description="Farmers, retailers and dealers with their credit limits and outstanding balances."
         />
         <CustomersPanel />
       </AppShell>
