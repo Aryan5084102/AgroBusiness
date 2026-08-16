@@ -48,6 +48,23 @@ demo organization and the one-click sign-in accounts. It requires
 **Unset it after the first successful deploy**, otherwise every restart
 re-runs the seed.
 
+## Frontend (Vercel)
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | `https://<backend>.onrender.com` — no trailing slash, the client concatenates paths directly |
+| `NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS` | `true` to show the login page's one-click demo panel |
+
+`NEXT_PUBLIC_*` values are inlined at build time, so changing either one needs a
+redeploy, not just a restart — and they must be set for every environment
+(Production/Preview/Development) that should use them.
+
+The demo panel defaults to the build type: visible under `next dev`, hidden in
+any production build — which is every hosted deploy. That is why a deployed demo
+has to set the flag explicitly. When it is off, the account list is stripped
+from the JavaScript bundle entirely rather than merely hidden, so only turn it
+on where the database was seeded with demo data.
+
 ## First deploy checklist
 
 1. Create the Postgres instance and copy its Internal Database URL.
