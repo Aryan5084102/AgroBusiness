@@ -1,0 +1,58 @@
+# Render Blueprint — provisions the backend and its database together.
+#
+# The point of this file is DATABASE_URL: `fromDatabase` injects the database's
+# internal connection string into the service automatically, so the one setting
+# that most often gets missed cannot be missed.
+#
+# Apply with: Render dashboard -> New + -> Blueprint -> pick this repo.
+# An existing manually-created service is NOT adopted by a blueprint; either
+# create a new service from this file, or copy the values below into the
+# existing service's Environment tab by hand.
+
+databases:
+  - name: agriflow-db
+    databaseName: agriflow
+    user: agriflow
+    plan: free # free instances are removed after 30 days — upgrade before then
+    region: oregon # must match the web service's region
+
+services:
+  - type: web
+    name: agriflow-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/live
+    envVars:
+      # The internal connection string. Never leaves Render's network and needs
+      # no TLS parameters, unlike the external URL.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agriflow-db
+          property: connectionString
+
+      # Generated once and stored by Render; never appears in the repo.
+      - key: SECRET_KEY
+        generateValue: true
+
+      # `staging` rather than `production` so the demo seed is permitted —
+      # app/seed.py refuses to run against a production environment.
+      - key: ENVIRONMENT
+        value: staging
+
+      # The frontend is on its own domain, so requests are cross-site: cookies
+      # need SameSite=None (which forces Secure). See docs/DEPLOYMENT.md.
+      - key: COOKIE_SAMESITE
+        value: none
+
+      # sync: false means "prompt me at deploy time" — this is the frontend's
+      # origin, which is not known until Vercel has assigned a domain.
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Creates the demo organisation and one-click sign-in accounts on first
+      # boot. Set to false once the data exists, or it re-seeds every restart.
+      - key: SEED_ON_START
+        value: true

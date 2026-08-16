@@ -7,6 +7,12 @@ configuration — without it the app falls back to development defaults and
 points at `localhost`, which surfaces as `500` on every database-backed
 endpoint while `/api/v1/live` still returns `200`.
 
+`render.yaml` at the repo root declares the database and the service together,
+wiring `DATABASE_URL` automatically via `fromDatabase`. Apply it with **New +
+→ Blueprint**. Note that a blueprint does not adopt a service that was created
+by hand — an existing service needs the variables below set on its Environment
+tab instead.
+
 ## Required environment variables
 
 | Variable | Value | Why |
