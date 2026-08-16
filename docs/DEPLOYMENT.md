@@ -21,6 +21,11 @@ Optional: `REDIS_URL` (only the `/api/v1/ready` probe uses it — login rate
 limiting is in-process, so a missing Redis reports `degraded` but breaks
 nothing), and the `S3_*` variables for attachment storage.
 
+The entrypoint refuses to boot when `DATABASE_URL` is missing or points at
+localhost, printing what to fix instead of an asyncpg traceback. `ALLOW_LOCALHOST_DB=true`
+overrides the localhost check for `docker run --network host` against a database
+on the host machine.
+
 Use the **Internal** database URL when the database and service share a region:
 it needs no TLS parameters and does not leave Render's network. The external
 URL requires appending `?ssl=require`.
