@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import parse_qsl, urlencode
 
 from pydantic import Field, PostgresDsn, RedisDsn, TypeAdapter, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -16,6 +17,42 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 # ergonomic use with SQLAlchemy / redis clients.
 _postgres_adapter = TypeAdapter(PostgresDsn)
 _redis_adapter = TypeAdapter(RedisDsn)
+
+# libpq spells its TLS options `sslmode=` / `channel_binding=`; the asyncpg
+# driver takes `ssl=` and nothing else. SQLAlchemy's asyncpg dialect forwards the
+# URL query straight to ``asyncpg.connect()``, whose signature has no **kwargs —
+# so a leftover libpq parameter becomes `TypeError: connect() got an unexpected
+# keyword argument 'sslmode'`, raised on the first query, well after startup
+# validation has passed and /live has gone green. Every hosted Postgres (Neon,
+# Supabase, Aiven, Render's *external* URL) appends at least one of them, so
+# translate the string rather than expect anyone to hand-edit it.
+_LIBPQ_TO_ASYNCPG = {"sslmode": "ssl"}
+_LIBPQ_UNSUPPORTED = frozenset({"channel_binding"})
+
+
+def _normalise_asyncpg_query(url: str) -> str:
+    """Rewrite libpq connection parameters into the ones asyncpg accepts."""
+    base, separator, query = url.partition("?")
+    if not separator:
+        return url
+
+    params = parse_qsl(query, keep_blank_values=True)
+    present = {key for key, _ in params}
+    cleaned: list[tuple[str, str]] = []
+    for key, value in params:
+        if key in _LIBPQ_UNSUPPORTED:
+            continue
+        target = _LIBPQ_TO_ASYNCPG.get(key)
+        if target is not None:
+            # An explicit `ssl=` alongside `sslmode=` means someone already did
+            # this by hand; keep theirs rather than emit the same key twice.
+            if target in present:
+                continue
+            key = target
+        cleaned.append((key, value))
+
+    return f"{base}?{urlencode(cleaned)}" if cleaned else base
+
 
 Environment = Literal["development", "test", "staging", "production"]
 
@@ -88,6 +125,7 @@ class Settings(BaseSettings):
             if value.startswith(prefix):
                 value = "postgresql+asyncpg://" + value[len(prefix) :]
                 break
+        value = _normalise_asyncpg_query(value)
         _postgres_adapter.validate_python(value)
         return value
 

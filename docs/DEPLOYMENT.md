@@ -33,8 +33,43 @@ overrides the localhost check for `docker run --network host` against a database
 on the host machine.
 
 Use the **Internal** database URL when the database and service share a region:
-it needs no TLS parameters and does not leave Render's network. The external
-URL requires appending `?ssl=require`.
+it needs no TLS parameters and does not leave Render's network.
+
+## Using a Postgres somewhere other than Render
+
+Render's free plan allows one Postgres instance and deletes it after 30 days, so
+the database often has to live elsewhere. Any Postgres 14+ works — Neon,
+Supabase, Aiven — and only `DATABASE_URL` changes; nothing in the image or the
+service config cares where the database is.
+
+Paste the provider's connection string **verbatim**. `_normalise_asyncpg_query`
+in `app/core/config.py` rewrites the parts asyncpg would otherwise reject:
+
+| Provider writes | Stored as | Why |
+| --- | --- | --- |
+| `postgres://` / `postgresql://` | `postgresql+asyncpg://` | selects the async driver |
+| `?sslmode=require` | `?ssl=require` | asyncpg's keyword is `ssl`; it has no `sslmode` |
+| `&channel_binding=require` | *(dropped)* | a libpq 14 parameter asyncpg never accepted |
+
+That translation matters because SQLAlchemy's asyncpg dialect forwards the query
+string to `asyncpg.connect()` untouched, and that signature accepts no
+`**kwargs`. An unrewritten `sslmode` is therefore a `TypeError` on the *first
+query* — startup succeeds, `/api/v1/live` returns `200`, and only real traffic
+fails.
+
+**Connection pooling.** Neon and Supabase both publish two endpoints. Prefer the
+**direct** one (Neon: the host *without* `-pooler`; Supabase: port `5432`, not
+`6543`). The pooled endpoints run PgBouncer in transaction mode, which is
+incompatible with the prepared statements asyncpg caches by default — the
+symptom is intermittent `prepared statement "__asyncpg_stmt_x__" does not exist`
+under load. This app opens one SQLAlchemy pool per instance and does not need an
+external pooler. If you must use one, append
+`&prepared_statement_cache_size=0` (passed through untouched by the rewrite
+above).
+
+**Region.** Put the database in the same region as the Render service. This is a
+cross-network hop now rather than an internal one, and every query pays the
+latency twice — once in the API, once in the migration step at boot.
 
 ## Cookies and the frontend's domain
 
