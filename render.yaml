@@ -42,13 +42,10 @@ services:
       - key: ENVIRONMENT
         value: staging
 
-      # The frontend is on its own domain, so requests are cross-site: cookies
-      # need SameSite=None (which forces Secure). See docs/DEPLOYMENT.md.
-      - key: COOKIE_SAMESITE
-        value: none
-
       # sync: false means "prompt me at deploy time" — this is the frontend's
-      # origin, which is not known until Vercel has assigned a domain.
+      # origin, which is not known until Vercel has assigned a domain. Setting it
+      # to a cross-site origin also resolves COOKIE_SAMESITE to `none` and
+      # COOKIE_SECURE to `true`, so neither needs declaring here.
       - key: CORS_ORIGINS
         sync: false
 

@@ -70,3 +70,122 @@ def test_internal_url_without_query_is_untouched() -> None:
     """Render's internal URL has no query string and needs no TLS parameters."""
     result = _url("postgresql://agriflow:secret@dpg-abc123-a/agriflow")
     assert result == "postgresql+asyncpg://agriflow:secret@dpg-abc123-a/agriflow"
+
+
+class TestCookieSameSiteDerivation:
+    """SameSite is derived from whether the frontend is a cross-site caller.
+
+    The failure this prevents is silent: with `lax` on a cross-domain frontend,
+    `/auth/login` returns 200 and a user payload, the browser drops the cookie,
+    and the very next request 401s.
+    """
+
+    def _settings(self, **kwargs: object) -> Settings:
+        return Settings(database_url="postgresql://u:p@db.example.com/agriflow", **kwargs)
+
+    def test_remote_origin_implies_cross_site(self) -> None:
+        settings = self._settings(cors_origins=["https://agrobusiness-frontend.vercel.app"])
+        assert settings.auth_cookie_samesite == "none"
+        # SameSite=None is discarded by browsers unless Secure is also set.
+        assert settings.auth_cookie_secure is True
+
+    def test_local_origin_stays_lax(self) -> None:
+        assert self._settings(cors_origins=["http://localhost:3000"]).auth_cookie_samesite == "lax"
+
+    def test_explicit_value_wins(self) -> None:
+        settings = self._settings(
+            cors_origins=["https://app.example.com"], cookie_samesite="lax"
+        )
+        assert settings.auth_cookie_samesite == "lax"
+
+
+class TestHostedConfigurationGuard:
+    """A hosted service on development defaults must fail loudly, not serve 500s."""
+
+    def _hosted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("RENDER", "true")
+
+    def test_localhost_database_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._hosted(monkeypatch)
+        settings = Settings(
+            database_url="postgresql://u:p@localhost:5432/agriflow",
+            cors_origins=["https://app.vercel.app"],
+            secret_key="a-real-secret-value",
+        )
+        with pytest.raises(RuntimeError, match="DATABASE_URL points at"):
+            settings.enforce_production_safety()
+
+    def test_local_only_cors_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._hosted(monkeypatch)
+        settings = Settings(
+            database_url="postgresql://u:p@db.example.com/agriflow",
+            cors_origins=["http://localhost:3000"],
+            secret_key="a-real-secret-value",
+        )
+        with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
+            settings.enforce_production_safety()
+
+    def test_placeholder_secret_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._hosted(monkeypatch)
+        settings = Settings(
+            database_url="postgresql://u:p@db.example.com/agriflow",
+            cors_origins=["https://app.vercel.app"],
+            secret_key="dev-insecure-change-me",
+        )
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            settings.enforce_production_safety()
+
+    def test_every_problem_is_reported_at_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Fixing one variable per redeploy is a slow way to find three bugs."""
+        self._hosted(monkeypatch)
+        settings = Settings(
+            database_url="postgresql://u:p@localhost:5432/agriflow",
+            cors_origins=["http://localhost:3000"],
+            secret_key="dev-insecure-change-me",
+        )
+        with pytest.raises(RuntimeError) as excinfo:
+            settings.enforce_production_safety()
+        message = str(excinfo.value)
+        assert "1. DATABASE_URL" in message
+        assert "2. CORS_ORIGINS" in message
+        assert "3. SECRET_KEY" in message
+
+    def test_fully_configured_service_boots(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._hosted(monkeypatch)
+        settings = Settings(
+            database_url="postgresql://u:p@ep-x.neon.tech/agriflow?sslmode=require",
+            cors_origins=["https://agrobusiness-frontend.vercel.app"],
+            secret_key="a-real-secret-value",
+            environment="staging",
+        )
+        settings.enforce_production_safety()
+        assert settings.auth_cookie_samesite == "none"
+
+    def test_localhost_database_allowed_explicitly(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`docker run --network host` against the host's Postgres is legitimate."""
+        self._hosted(monkeypatch)
+        monkeypatch.setenv("ALLOW_LOCALHOST_DB", "true")
+        settings = Settings(
+            database_url="postgresql://u:p@localhost:5432/agriflow",
+            cors_origins=["https://app.vercel.app"],
+            secret_key="a-real-secret-value",
+        )
+        settings.enforce_production_safety()
+
+    def test_laptop_is_left_alone(self) -> None:
+        """No platform marker: dev defaults are exactly what you want."""
+        Settings(
+            database_url="postgresql://u:p@localhost:5432/agriflow"
+        ).enforce_production_safety()
+
+    def test_environment_defaults_to_staging_when_hosted(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        self._hosted(monkeypatch)
+        # _env_file=None: a developer's local .env pins ENVIRONMENT=development,
+        # and a hosted container has no .env at all — this asserts the container.
+        settings = Settings(
+            _env_file=None, database_url="postgresql://u:p@db.example.com/x"
+        )
+        assert settings.environment == "staging"

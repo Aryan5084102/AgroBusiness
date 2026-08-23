@@ -6,9 +6,10 @@ fail fast at startup rather than surfacing as runtime errors later.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from typing import Annotated, Literal
-from urllib.parse import parse_qsl, urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from pydantic import Field, PostgresDsn, RedisDsn, TypeAdapter, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -54,6 +55,38 @@ def _normalise_asyncpg_query(url: str) -> str:
     return f"{base}?{urlencode(cleaned)}" if cleaned else base
 
 
+# Managed platforms each export a marker variable into the container. Their
+# presence is the difference between "someone is running this locally with a
+# half-filled .env" (fine) and "this is serving real traffic on development
+# defaults" (never fine, and previously silent — /live returns 200 whether or
+# not the database was ever configured, so the service looks healthy while every
+# real endpoint 500s).
+_HOSTED_PLATFORM_MARKERS = (
+    "RENDER",  # Render (also sets RENDER_EXTERNAL_URL)
+    "DYNO",  # Heroku
+    "FLY_APP_NAME",  # Fly.io
+    "RAILWAY_ENVIRONMENT",  # Railway
+    "K_SERVICE",  # Google Cloud Run
+)
+
+_LOCAL_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1", ""})
+
+
+def _is_hosted() -> bool:
+    """Whether the process is running on a managed hosting platform."""
+    return any(os.environ.get(marker) for marker in _HOSTED_PLATFORM_MARKERS)
+
+
+def _host_of(url: str) -> str:
+    """Hostname from a URL, lowercased and stripped of brackets/port."""
+    return (urlsplit(url).hostname or "").lower()
+
+
+def _is_local_url(url: str) -> bool:
+    """Whether a URL points at the machine the process is running on."""
+    return _host_of(url) in _LOCAL_HOSTNAMES
+
+
 Environment = Literal["development", "test", "staging", "production"]
 
 
@@ -68,7 +101,12 @@ class Settings(BaseSettings):
     )
 
     # --- Meta -------------------------------------------------------------
-    environment: Environment = "development"
+    # Unset on a laptop means development; unset on Render/Fly/Heroku means
+    # someone forgot the variable, and "development" there disables JSON logging,
+    # exposes /docs, and waves through the placeholder SECRET_KEY.
+    environment: Environment = Field(
+        default_factory=lambda: "staging" if _is_hosted() else "development"
+    )
     debug: bool = False
     app_name: str = "AgriFlow ERP"
     api_v1_prefix: str = "/api/v1"
@@ -97,7 +135,9 @@ class Settings(BaseSettings):
     # cookies to those requests when SameSite=None, which they in turn only
     # accept on Secure cookies. ``cookie_secure`` overrides the derived value
     # for the rare case of a non-HTTPS staging host.
-    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    # ``None`` means "derive it" — see ``auth_cookie_samesite``. An explicit
+    # value always wins, for the deployment shapes the derivation cannot see.
+    cookie_samesite: Literal["lax", "strict", "none"] | None = None
     cookie_secure: bool | None = None
 
     # --- CORS -------------------------------------------------------------
@@ -148,6 +188,23 @@ class Settings(BaseSettings):
         return self.environment == "production"
 
     @property
+    def auth_cookie_samesite(self) -> Literal["lax", "strict", "none"]:
+        """The SameSite attribute to put on auth cookies.
+
+        Needing CORS at all *is* the signal: a same-origin frontend is served
+        under the API's hostname and never appears in ``CORS_ORIGINS``. So a
+        configured non-local origin means every request is cross-site, and
+        browsers only attach cookies to those when SameSite=None. Getting this
+        wrong fails quietly — login returns 200 with a user payload, the browser
+        discards the cookie, and the next request 401s.
+        """
+        if self.cookie_samesite is not None:
+            return self.cookie_samesite
+        if any(not _is_local_url(origin) for origin in self.cors_origins):
+            return "none"
+        return "lax"
+
+    @property
     def auth_cookie_secure(self) -> bool:
         """Whether auth cookies carry the ``Secure`` attribute.
 
@@ -156,16 +213,61 @@ class Settings(BaseSettings):
         """
         if self.cookie_secure is not None:
             return self.cookie_secure
-        return self.cookie_samesite == "none" or self.is_production
+        return self.auth_cookie_samesite == "none" or self.is_production
 
     def enforce_production_safety(self) -> None:
-        """Reject insecure defaults when running in production."""
+        """Reject insecure or unconfigured defaults before serving traffic."""
         if self.is_production and self.secret_key == "dev-insecure-change-me":
             raise RuntimeError("SECRET_KEY must be set to a strong value in production.")
         # Browsers reject SameSite=None cookies that are not Secure, which would
         # break every login with no server-side error to show for it.
-        if self.cookie_samesite == "none" and not self.auth_cookie_secure:
+        if self.auth_cookie_samesite == "none" and not self.auth_cookie_secure:
             raise RuntimeError("COOKIE_SAMESITE=none requires COOKIE_SECURE=true (HTTPS).")
+        self._enforce_hosted_configuration()
+
+    def _enforce_hosted_configuration(self) -> None:
+        """Refuse to boot on a hosting platform while still on dev defaults.
+
+        ``docker-entrypoint.sh`` already guards the Docker path, but a service
+        created with a native runtime never runs it. Without this the process
+        starts happily, ``/api/v1/live`` returns 200, and the misconfiguration
+        only shows up as a 500 on the first real request — or, for CORS, as a
+        browser-side error the server never even logs.
+        """
+        if not _is_hosted():
+            return
+
+        problems: list[str] = []
+
+        if _is_local_url(self.database_url) and os.environ.get("ALLOW_LOCALHOST_DB") != "true":
+            problems.append(
+                f"DATABASE_URL points at {_host_of(self.database_url) or 'localhost'!r}. "
+                "A container's localhost is itself, not your database. Set it to the "
+                "managed Postgres connection string (Neon/Supabase/Render Internal URL). "
+                "Set ALLOW_LOCALHOST_DB=true only if you really do mean the local host."
+            )
+
+        if not self.cors_origins or all(_is_local_url(o) for o in self.cors_origins):
+            problems.append(
+                f"CORS_ORIGINS is {self.cors_origins!r}, which allows only local origins. "
+                "Browsers will reject every request from the deployed frontend with "
+                "'Disallowed CORS origin' before it reaches the app. Set it to the "
+                "frontend's exact origin, e.g. https://your-app.vercel.app (no trailing slash)."
+            )
+
+        if self.secret_key == "dev-insecure-change-me":
+            problems.append(
+                "SECRET_KEY is still the public placeholder, so auth tokens are forgeable. "
+                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+            )
+
+        if problems:
+            listed = "\n".join(f"  {n}. {problem}" for n, problem in enumerate(problems, 1))
+            raise RuntimeError(
+                "Refusing to start: this looks like a hosted deployment, but required "
+                f"configuration is missing.\n{listed}\n"
+                "  Set these on the service and redeploy. See docs/DEPLOYMENT.md."
+            )
 
 
 @lru_cache

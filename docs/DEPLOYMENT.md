@@ -3,9 +3,15 @@
 The backend image is self-sufficient: `docker-entrypoint.sh` runs
 `alembic upgrade head` on every boot (idempotent) and the server binds to
 `$PORT` if the platform assigns one. What the platform still has to supply is
-configuration — without it the app falls back to development defaults and
-points at `localhost`, which surfaces as `500` on every database-backed
-endpoint while `/api/v1/live` still returns `200`.
+configuration.
+
+The app detects that it is running on a managed platform (Render, Heroku, Fly,
+Railway, Cloud Run all export a marker variable) and **refuses to start** if it
+is still on development defaults, listing every missing variable at once. This
+replaces the old failure mode, where an unconfigured service booted happily,
+answered `/api/v1/live` with `200`, and returned `500` on every database-backed
+endpoint — or, for CORS, failed only in the browser, with nothing in the server
+log at all.
 
 `render.yaml` at the repo root declares the database and the service together,
 wiring `DATABASE_URL` automatically via `fromDatabase`. Apply it with **New +
@@ -15,13 +21,21 @@ tab instead.
 
 ## Required environment variables
 
+Three variables have no safe default, because only you know their values:
+
 | Variable | Value | Why |
 | --- | --- | --- |
-| `DATABASE_URL` | Render Postgres **Internal Database URL** | Without it the app dials `localhost:5432`. A pasted `postgres://…` is normalised to `postgresql+asyncpg://` automatically. |
+| `DATABASE_URL` | the managed Postgres connection string | Without it the app dials `localhost:5432`. A pasted `postgres://…` is normalised to `postgresql+asyncpg://` automatically. |
 | `SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(48))"` | Signs auth tokens. The default is public and forgeable. |
-| `ENVIRONMENT` | `staging` or `production` | Gates the strong-secret check and JSON logging. |
-| `CORS_ORIGINS` | the frontend's exact origin | Credentials are sent on every request, so browsers reject `*`. |
-| `COOKIE_SAMESITE` | `none` for a cross-domain frontend, else `lax` | See below. |
+| `CORS_ORIGINS` | the frontend's exact origin, no trailing slash | Credentials are sent on every request, so browsers reject `*`. |
+
+Derived automatically — set them only to override:
+
+| Variable | Derived as | |
+| --- | --- | --- |
+| `ENVIRONMENT` | `staging` when a hosting platform is detected, else `development` | Gates the strong-secret check and JSON logging. |
+| `COOKIE_SAMESITE` | `none` when `CORS_ORIGINS` names a non-local origin, else `lax` | Needing CORS at all means the frontend is a cross-site caller. See below. |
+| `COOKIE_SECURE` | `true` whenever SameSite resolves to `none` | Browsers discard `SameSite=None` cookies that are not `Secure`. |
 
 Optional: `REDIS_URL` (only the `/api/v1/ready` probe uses it — login rate
 limiting is in-process, so a missing Redis reports `degraded` but breaks
@@ -76,12 +90,14 @@ latency twice — once in the API, once in the migration step at boot.
 Auth travels in HTTP-only cookies, so the frontend's domain decides the
 setting:
 
-- **Frontend proxied under the API's hostname** — keep `COOKIE_SAMESITE=lax`.
+- **Frontend proxied under the API's hostname** — it is same-origin, never
+  appears in `CORS_ORIGINS`, and SameSite resolves to `lax`.
 - **Frontend on its own domain** (Vercel, Netlify, a second Render service) —
   every request is cross-site, and browsers only attach cookies to those when
-  `SameSite=None`, which they in turn only accept when `Secure` is set. Use
-  `COOKIE_SAMESITE=none`; `Secure` is then applied automatically, and startup
-  refuses to proceed if you force `COOKIE_SECURE=false`.
+  `SameSite=None`, which they in turn only accept when `Secure` is set. Setting
+  `CORS_ORIGINS` to that domain resolves SameSite to `none` and `Secure` to
+  `true` on its own; startup refuses to proceed if you force
+  `COOKIE_SECURE=false` against it.
 
 The failure mode when this is wrong is quiet: `/auth/login` returns `200` with
 a user payload, the browser discards the cookie, and the next request 401s.
@@ -113,11 +129,14 @@ on where the database was seeded with demo data.
 
 ## First deploy checklist
 
-1. Create the Postgres instance and copy its Internal Database URL.
-2. Set the variables above on the service.
+1. Create the Postgres instance and copy its connection string.
+2. Set the three required variables above on the service.
 3. Deploy. The logs should show `[entrypoint] running database migrations…`
-   followed by the Alembic revisions applying.
-4. `curl https://<service>/api/v1/ready` — `database` should read `up`.
+   followed by the Alembic revisions applying. If a variable is missing, the
+   process exits during startup with a numbered list of what to fix.
+4. `curl https://<service>/api/v1/ready` — `environment` should read `staging`
+   and `database` should read `up`. `redis` reads `down` unless you set
+   `REDIS_URL`; that is expected and harmless.
    (First request after idle takes ~30s on Render's free tier; the instance
    spins down when unused.)
 5. Sign in from the frontend and confirm the session survives a page reload —

@@ -23,7 +23,7 @@ router = APIRouter(tags=["auth"])
 def _set_auth_cookies(response: Response, tokens: IssuedTokens) -> None:
     settings = get_settings()
     secure = settings.auth_cookie_secure
-    samesite = settings.cookie_samesite
+    samesite = settings.auth_cookie_samesite
     response.set_cookie(
         ACCESS_COOKIE,
         tokens.access_token,
@@ -125,7 +125,7 @@ async def logout(
             path="/",
             httponly=True,
             secure=settings.auth_cookie_secure,
-            samesite=settings.cookie_samesite,
+            samesite=settings.auth_cookie_samesite,
         )
     response.status_code = 204
     return response
