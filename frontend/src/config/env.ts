@@ -2,8 +2,11 @@
 // values are exposed to the browser; secrets never live here.
 import { z } from 'zod';
 
+// NEXT_PUBLIC_API_BASE_URL is deliberately absent. The browser calls /api/* on
+// its own origin and next.config.mjs proxies to the backend, so the API's
+// address is a build-time server concern (API_PROXY_TARGET) rather than
+// something shipped to the client.
 const schema = z.object({
-  NEXT_PUBLIC_API_BASE_URL: z.string().url().default('http://localhost:8000'),
   // Opt-in for the login page's demo-account panel. Unset means "follow the
   // build type" — visible in dev, hidden in a production build. Deployed demo
   // environments set it to 'true' explicitly, since a hosted build is always a
@@ -16,7 +19,6 @@ const schema = z.object({
 
 // Next inlines NEXT_PUBLIC_* only at literal references, so each one is listed.
 const parsed = schema.safeParse({
-  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS: process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS,
 });
 

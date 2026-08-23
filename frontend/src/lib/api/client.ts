@@ -3,7 +3,6 @@
 // credentials so HTTP-only auth cookies flow. A code-generated OpenAPI client
 // replaces the hand-written endpoint calls in a later phase; this thin layer
 // establishes the error contract now.
-import { env } from '@/config/env';
 
 export interface ApiErrorBody {
   code: string;
@@ -37,7 +36,8 @@ export async function apiFetch<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { body, headers, ...rest } = options;
-  const response = await fetch(`${env.NEXT_PUBLIC_API_BASE_URL}${path}`, {
+  // Same-origin: next.config.mjs rewrites /api/* to the backend.
+  const response = await fetch(path, {
     ...rest,
     credentials: 'include',
     headers: {

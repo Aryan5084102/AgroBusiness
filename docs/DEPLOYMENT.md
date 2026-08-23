@@ -114,12 +114,33 @@ re-runs the seed.
 
 | Variable | Value |
 | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | `https://<backend>.onrender.com` — no trailing slash, the client concatenates paths directly |
+| `API_PROXY_TARGET` | `https://<backend>.onrender.com` — no trailing slash |
 | `NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS` | `true` to show the login page's one-click demo panel |
 
-`NEXT_PUBLIC_*` values are inlined at build time, so changing either one needs a
-redeploy, not just a restart — and they must be set for every environment
+The browser calls `/api/*` on the frontend's own origin and `next.config.mjs`
+rewrites those to `API_PROXY_TARGET` server-side. Nothing the browser sends is
+cross-origin, which removes two failure modes that previously depended on the
+backend being configured exactly right:
+
+- **CORS.** There is no preflight to reject, so a wrong `CORS_ORIGINS` cannot
+  block the app. The browser used to report `Disallowed CORS origin` while the
+  server logged an ordinary request.
+- **Cookie SameSite.** Same-origin requests carry cookies without
+  `SameSite=None`, so the quiet variant — `200` from `/auth/login`, cookie
+  discarded, `401` on the next call — cannot happen.
+
+`NEXT_PUBLIC_API_BASE_URL` is still read as a fallback upstream so existing
+deployments keep working, but it no longer reaches the browser and new setups
+should use `API_PROXY_TARGET`.
+
+Both values are applied at build time, so changing either needs a redeploy, not
+just a restart — and they must be set for every environment
 (Production/Preview/Development) that should use them.
+
+One limit worth knowing: proxied requests pass through Vercel's function layer,
+which caps request bodies (4.5 MB on serverless). Nothing in the app posts
+multipart bodies today, so this only matters if attachment upload is added
+later — that would want a direct-to-S3 presigned upload regardless.
 
 The demo panel defaults to the build type: visible under `next dev`, hidden in
 any production build — which is every hosted deploy. That is why a deployed demo

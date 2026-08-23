@@ -1,5 +1,4 @@
 // Reporting API: registers, valuation, trend, top products, CSV export.
-import { env } from '@/config/env';
 import { apiFetch } from '@/lib/api/client';
 
 export interface RegisterRow {
@@ -112,7 +111,7 @@ export async function downloadRegisterCsv(
   to: string,
 ): Promise<void> {
   const response = await fetch(
-    `${env.NEXT_PUBLIC_API_BASE_URL}/api/v1/reports/export/${register}?date_from=${from}&date_to=${to}`,
+    `/api/v1/reports/export/${register}?date_from=${from}&date_to=${to}`,
     { credentials: 'include' },
   );
   if (!response.ok) {
