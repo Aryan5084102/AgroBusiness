@@ -21,13 +21,13 @@ tab instead.
 
 ## Required environment variables
 
-Three variables have no safe default, because only you know their values:
+Two variables have no safe default, because only you know their values. A
+hosted service refuses to start without them:
 
 | Variable | Value | Why |
 | --- | --- | --- |
 | `DATABASE_URL` | the managed Postgres connection string | Without it the app dials `localhost:5432`. A pasted `postgres://…` is normalised to `postgresql+asyncpg://` automatically. |
 | `SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(48))"` | Signs auth tokens. The default is public and forgeable. |
-| `CORS_ORIGINS` | the frontend's exact origin, no trailing slash | Credentials are sent on every request, so browsers reject `*`. |
 
 Derived automatically — set them only to override:
 
@@ -35,7 +35,12 @@ Derived automatically — set them only to override:
 | --- | --- | --- |
 | `ENVIRONMENT` | `staging` when a hosting platform is detected, else `development` | Gates the strong-secret check and JSON logging. |
 | `COOKIE_SAMESITE` | `none` when `CORS_ORIGINS` names a non-local origin, else `lax` | Needing CORS at all means the frontend is a cross-site caller. See below. |
-| `COOKIE_SECURE` | `true` whenever SameSite resolves to `none` | Browsers discard `SameSite=None` cookies that are not `Secure`. |
+| `COOKIE_SECURE` | `true` on any hosted platform, or whenever SameSite resolves to `none` | Hosted platforms are HTTPS-only; browsers also discard `SameSite=None` cookies that are not `Secure`. |
+
+`CORS_ORIGINS` is **not** required. The frontend proxies `/api/*` through its own
+origin, so the browser never makes a cross-origin request and there is no
+preflight to allow. Set it only for a client that does call this API
+cross-origin; an unset value logs a startup warning and blocks nothing.
 
 Optional: `REDIS_URL` (only the `/api/v1/ready` probe uses it — login rate
 limiting is in-process, so a missing Redis reports `degraded` but breaks

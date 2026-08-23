@@ -115,40 +115,50 @@ class TestHostedConfigurationGuard:
         with pytest.raises(RuntimeError, match="DATABASE_URL points at"):
             settings.enforce_production_safety()
 
-    def test_local_only_cors_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_unset_cors_is_not_fatal(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The frontend proxies /api/* same-origin, so CORS_ORIGINS blocks nothing.
+
+        Making it fatal would refuse a perfectly working deployment over a
+        variable the browser never exercises.
+        """
         self._hosted(monkeypatch)
         settings = Settings(
             database_url="postgresql://u:p@db.example.com/agriflow",
             cors_origins=["http://localhost:3000"],
             secret_key="a-real-secret-value",
         )
-        with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
-            settings.enforce_production_safety()
+        settings.enforce_production_safety()
+        # Same-origin means no cross-site cookie delivery either.
+        assert settings.auth_cookie_samesite == "lax"
+        # ...but a hosted deployment is HTTPS, so the cookie is still Secure.
+        assert settings.auth_cookie_secure is True
+
+    def test_local_development_cookies_are_not_secure(self) -> None:
+        """`Secure` on http://localhost would stop the cookie being stored at all."""
+        settings = Settings(database_url="postgresql://u:p@localhost/agriflow")
+        assert settings.auth_cookie_secure is False
 
     def test_placeholder_secret_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._hosted(monkeypatch)
         settings = Settings(
             database_url="postgresql://u:p@db.example.com/agriflow",
-            cors_origins=["https://app.vercel.app"],
             secret_key="dev-insecure-change-me",
         )
         with pytest.raises(RuntimeError, match="SECRET_KEY"):
             settings.enforce_production_safety()
 
     def test_every_problem_is_reported_at_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Fixing one variable per redeploy is a slow way to find three bugs."""
+        """Fixing one variable per redeploy is a slow way to find two bugs."""
         self._hosted(monkeypatch)
         settings = Settings(
             database_url="postgresql://u:p@localhost:5432/agriflow",
-            cors_origins=["http://localhost:3000"],
             secret_key="dev-insecure-change-me",
         )
         with pytest.raises(RuntimeError) as excinfo:
             settings.enforce_production_safety()
         message = str(excinfo.value)
         assert "1. DATABASE_URL" in message
-        assert "2. CORS_ORIGINS" in message
-        assert "3. SECRET_KEY" in message
+        assert "2. SECRET_KEY" in message
 
     def test_fully_configured_service_boots(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._hosted(monkeypatch)

@@ -210,10 +210,15 @@ class Settings(BaseSettings):
 
         SameSite=None is meaningless without it — browsers drop such cookies
         outright — so it is forced on there regardless of environment.
+
+        Hosted platforms terminate TLS and serve only over HTTPS, so auth
+        cookies there get ``Secure`` whether the environment is called staging
+        or production. Without this a demo deployment sends session cookies that
+        a downgraded request would happily replay over plaintext.
         """
         if self.cookie_secure is not None:
             return self.cookie_secure
-        return self.auth_cookie_samesite == "none" or self.is_production
+        return self.auth_cookie_samesite == "none" or self.is_production or _is_hosted()
 
     def enforce_production_safety(self) -> None:
         """Reject insecure or unconfigured defaults before serving traffic."""
@@ -231,8 +236,13 @@ class Settings(BaseSettings):
         ``docker-entrypoint.sh`` already guards the Docker path, but a service
         created with a native runtime never runs it. Without this the process
         starts happily, ``/api/v1/live`` returns 200, and the misconfiguration
-        only shows up as a 500 on the first real request — or, for CORS, as a
-        browser-side error the server never even logs.
+        only shows up as a 500 on the first real request.
+
+        Only settings with no workable default are fatal. ``CORS_ORIGINS`` is
+        deliberately not among them: the frontend proxies ``/api/*`` through its
+        own origin (see ``frontend/next.config.mjs``), so a browser never makes a
+        cross-origin request and an unset value blocks nothing. It stays a
+        startup warning for deployments that do call the API cross-origin.
         """
         if not _is_hosted():
             return
@@ -245,14 +255,6 @@ class Settings(BaseSettings):
                 "A container's localhost is itself, not your database. Set it to the "
                 "managed Postgres connection string (Neon/Supabase/Render Internal URL). "
                 "Set ALLOW_LOCALHOST_DB=true only if you really do mean the local host."
-            )
-
-        if not self.cors_origins or all(_is_local_url(o) for o in self.cors_origins):
-            problems.append(
-                f"CORS_ORIGINS is {self.cors_origins!r}, which allows only local origins. "
-                "Browsers will reject every request from the deployed frontend with "
-                "'Disallowed CORS origin' before it reaches the app. Set it to the "
-                "frontend's exact origin, e.g. https://your-app.vercel.app (no trailing slash)."
             )
 
         if self.secret_key == "dev-insecure-change-me":
