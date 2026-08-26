@@ -212,3 +212,95 @@ async def test_walk_in_must_pay_in_full() -> None:
                 payments=[PaymentInput(method=PaymentMethod.CASH, amount=Decimal("100"))],
             )
         assert exc.value.code == "walk_in_credit_not_allowed"
+
+
+async def test_counter_khata_sale_lands_as_credit() -> None:
+    """A named customer may take goods with nothing paid — it becomes a receivable."""
+    ids = await _setup()
+    factory = get_sessionmaker()
+    async with factory() as session:
+        service = SalesService(session)
+        result = await service.create_retail_invoice(
+            organization_id=ids["org"],
+            warehouse_id=ids["warehouse"],
+            customer_id=ids["customer"],
+            invoice_date=TODAY,
+            as_of=TODAY,
+            lines=[SaleLineInput(product_id=ids["product"], base_quantity=Decimal("2"))],
+            payments=[],  # the whole bill goes on khata
+        )
+        await session.commit()
+
+    assert result.payment_status is PaymentStatus.CREDIT
+    assert result.paid_amount == Decimal("0.00")
+    assert result.grand_total > 0
+
+
+async def test_counter_khata_respects_the_credit_limit() -> None:
+    """The limit that governs dealer orders governs the counter too.
+
+    Without this the limit would be enforceable on the wholesale screen and
+    silently skipped for the same customer at the retail counter.
+    """
+    ids = await _setup()
+    factory = get_sessionmaker()
+    async with factory() as session:
+        customer = await session.get(Customer, ids["customer"])
+        assert customer is not None
+        customer.credit_limit = Decimal("300")
+        await session.commit()
+
+    async with factory() as session:
+        service = SalesService(session)
+        with pytest.raises(BusinessRuleError) as exc:
+            await service.create_retail_invoice(
+                organization_id=ids["org"],
+                warehouse_id=ids["warehouse"],
+                customer_id=ids["customer"],
+                invoice_date=TODAY,
+                as_of=TODAY,
+                # 3 x 200 + GST is well past a 300 limit.
+                lines=[SaleLineInput(product_id=ids["product"], base_quantity=Decimal("3"))],
+                payments=[],
+            )
+        assert exc.value.code == "credit_limit_exceeded"
+
+    # A part payment that brings the unpaid balance under the limit is fine.
+    async with factory() as session:
+        service = SalesService(session)
+        result = await service.create_retail_invoice(
+            organization_id=ids["org"],
+            warehouse_id=ids["warehouse"],
+            customer_id=ids["customer"],
+            invoice_date=TODAY,
+            as_of=TODAY,
+            lines=[SaleLineInput(product_id=ids["product"], base_quantity=Decimal("3"))],
+            payments=[PaymentInput(method=PaymentMethod.CASH, amount=Decimal("500"))],
+        )
+        await session.commit()
+        assert result.payment_status is PaymentStatus.PARTIAL
+
+
+async def test_customer_without_a_limit_is_unlimited_at_the_counter() -> None:
+    """credit_limit = 0 means "no limit set", matching the wholesale rule."""
+    ids = await _setup()
+    factory = get_sessionmaker()
+    async with factory() as session:
+        customer = await session.get(Customer, ids["customer"])
+        assert customer is not None
+        customer.credit_limit = Decimal("0")
+        await session.commit()
+
+    async with factory() as session:
+        service = SalesService(session)
+        result = await service.create_retail_invoice(
+            organization_id=ids["org"],
+            warehouse_id=ids["warehouse"],
+            customer_id=ids["customer"],
+            invoice_date=TODAY,
+            as_of=TODAY,
+            lines=[SaleLineInput(product_id=ids["product"], base_quantity=Decimal("5"))],
+            payments=[],
+        )
+        await session.commit()
+        assert result.payment_status is PaymentStatus.CREDIT

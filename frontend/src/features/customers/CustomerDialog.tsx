@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { FieldRow, Input, Select } from '@/components/ui/Field';
+import { FieldRow, Input, Select, TextArea } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api/client';
@@ -33,6 +33,7 @@ const EMPTY = {
   customer_type: 'dealer' as CustomerType,
   phone: '',
   gstin: '',
+  address: '',
   village: '',
   credit_limit: '0',
   credit_period_days: '30',
@@ -58,6 +59,7 @@ export function CustomerDialog({ open, customer, onClose }: CustomerDialogProps)
             customer_type: customer.customer_type,
             phone: customer.phone ?? '',
             gstin: customer.gstin ?? '',
+            address: customer.address ?? '',
             village: customer.village ?? '',
             credit_limit: customer.credit_limit,
             credit_period_days: String(customer.credit_period_days),
@@ -80,6 +82,7 @@ export function CustomerDialog({ open, customer, onClose }: CustomerDialogProps)
       customer_type: form.customer_type,
       phone: form.phone || undefined,
       gstin: form.gstin || undefined,
+      address: form.address.trim() || undefined,
       village: form.village || undefined,
       credit_limit: form.credit_limit || '0',
       credit_period_days: Number(form.credit_period_days || 0),
@@ -189,6 +192,14 @@ export function CustomerDialog({ open, customer, onClose }: CustomerDialogProps)
             onChange={(event) => set('village', event.target.value)}
           />
         </FieldRow>
+
+        <TextArea
+          label="Address"
+          rows={2}
+          hint="Printed in the 'billed to' block of this dealer's tax invoice."
+          value={form.address}
+          onChange={(event) => set('address', event.target.value)}
+        />
 
         {error ? (
           <p role="alert" className={styles.error}>

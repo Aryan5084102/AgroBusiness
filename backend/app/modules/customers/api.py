@@ -26,6 +26,7 @@ class CustomerOut(BaseModel):
     customer_type: CustomerType
     phone: str | None
     gstin: str | None
+    address: str | None
     village: str | None
     credit_limit: Decimal
     credit_period_days: int
@@ -40,6 +41,7 @@ class CreateCustomerRequest(BaseModel):
     customer_type: CustomerType = CustomerType.RETAIL
     phone: str | None = Field(default=None, max_length=20)
     gstin: str | None = Field(default=None, max_length=20)
+    address: str | None = Field(default=None, max_length=400)
     village: str | None = Field(default=None, max_length=120)
     credit_limit: Decimal = Field(default=Decimal("0"), ge=0)
     credit_period_days: int = Field(default=0, ge=0, le=365)
@@ -50,6 +52,7 @@ class UpdateCustomerRequest(BaseModel):
     customer_type: CustomerType | None = None
     phone: str | None = Field(default=None, max_length=20)
     gstin: str | None = Field(default=None, max_length=20)
+    address: str | None = Field(default=None, max_length=400)
     village: str | None = Field(default=None, max_length=120)
     credit_limit: Decimal | None = Field(default=None, ge=0)
     credit_period_days: int | None = Field(default=None, ge=0, le=365)
@@ -64,6 +67,7 @@ def _to_out(customer: Customer, outstanding: Decimal) -> CustomerOut:
         customer_type=customer.customer_type,
         phone=customer.phone,
         gstin=customer.gstin,
+        address=customer.address,
         village=customer.village,
         credit_limit=customer.credit_limit,
         credit_period_days=customer.credit_period_days,
@@ -98,8 +102,16 @@ async def list_customers(
         .order_by(Customer.name)
     )
     if search:
+        # Phone is in the predicate because the counter identifies a returning
+        # customer by their mobile number, not by a code they have never seen.
         pattern = f"%{search.strip()}%"
-        stmt = stmt.where(or_(Customer.name.ilike(pattern), Customer.code.ilike(pattern)))
+        stmt = stmt.where(
+            or_(
+                Customer.name.ilike(pattern),
+                Customer.code.ilike(pattern),
+                Customer.phone.ilike(pattern),
+            )
+        )
 
     rows = await session.execute(stmt)
     return [_to_out(customer, Decimal(str(outstanding))) for customer, outstanding in rows.all()]
@@ -152,6 +164,7 @@ async def create_customer(
         customer_type=payload.customer_type,
         phone=payload.phone,
         gstin=payload.gstin,
+        address=payload.address,
         village=payload.village,
         credit_limit=payload.credit_limit,
         credit_period_days=payload.credit_period_days,

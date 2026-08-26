@@ -64,11 +64,17 @@ export interface FinalizeInput {
   customerId?: string | null;
   lines: CartLine[];
   method: PaymentMethod;
+  /** Taken now. "0" means the whole bill goes on the customer's khata. */
   amount: string;
   idempotencyKey: string;
 }
 
 export function finalizeSale(input: FinalizeInput): Promise<FinalizeResult> {
+  // The API rejects a zero-amount payment, so a full-credit sale sends no
+  // payment at all and the invoice lands as outstanding.
+  const payments =
+    Number(input.amount) > 0 ? [{ method: input.method, amount: input.amount }] : [];
+
   return apiFetch<FinalizeResult>('/api/v1/pos/invoices', {
     method: 'POST',
     headers: { 'Idempotency-Key': input.idempotencyKey },
@@ -76,7 +82,7 @@ export function finalizeSale(input: FinalizeInput): Promise<FinalizeResult> {
       warehouse_id: input.warehouseId,
       customer_id: input.customerId ?? null,
       lines: input.lines,
-      payments: [{ method: input.method, amount: input.amount }],
+      payments,
     },
   });
 }

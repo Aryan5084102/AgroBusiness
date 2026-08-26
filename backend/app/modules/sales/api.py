@@ -14,10 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.context import CurrentUser
 from app.core.deps import db_session, require_permission
 from app.core.exceptions import NotFoundError
-from app.modules.catalogue.models import Product
+from app.modules.catalogue.models import Product, Unit
 from app.modules.customers.models import Customer
 from app.modules.organizations.models import Warehouse
-from app.modules.payments.models import PaymentMethod
+from app.modules.payments.models import Payment, PaymentAllocation, PaymentMethod
 from app.modules.sales.models import (
     PaymentStatus,
     SaleChannel,
@@ -114,6 +114,8 @@ class InvoiceItemOut(BaseModel):
     product_id: uuid.UUID
     product_name: str
     sku: str
+    hsn_code: str | None
+    unit_code: str
     base_quantity: Decimal
     unit_price: Decimal
     price_source: str
@@ -124,12 +126,24 @@ class InvoiceItemOut(BaseModel):
     line_total: Decimal
 
 
+class InvoicePaymentOut(BaseModel):
+    method: PaymentMethod
+    amount: Decimal
+    reference: str | None
+
+
 class InvoiceDetail(InvoiceListItem):
     subtotal: Decimal
     discount_total: Decimal
     tax_total: Decimal
     customer_id: uuid.UUID | None
+    # Buyer details a printed tax invoice has to carry.
+    customer_phone: str | None
+    customer_gstin: str | None
+    customer_address: str | None
+    customer_village: str | None
     items: list[InvoiceItemOut]
+    payments: list[InvoicePaymentOut]
 
 
 @router.get("/invoices", response_model=InvoicePage)
@@ -212,7 +226,16 @@ async def get_invoice(
 ) -> InvoiceDetail:
     row = (
         await session.execute(
-            select(SalesInvoice, Customer.name, Warehouse.name, User.full_name)
+            select(
+                SalesInvoice,
+                Customer.name,
+                Warehouse.name,
+                User.full_name,
+                Customer.phone,
+                Customer.gstin,
+                Customer.address,
+                Customer.village,
+            )
             .outerjoin(Customer, Customer.id == SalesInvoice.customer_id)
             .join(Warehouse, Warehouse.id == SalesInvoice.warehouse_id)
             .outerjoin(User, User.id == SalesInvoice.created_by)
@@ -224,13 +247,23 @@ async def get_invoice(
     ).first()
     if row is None:
         raise NotFoundError("Unknown invoice.")
-    invoice, customer_name, warehouse_name, actor = row
+    invoice, customer_name, warehouse_name, actor, phone, gstin, address, village = row
 
+    # HSN and the selling unit come from the product; both are printed on the
+    # tax invoice, so the detail payload carries them rather than making the
+    # bill fetch every product separately.
     item_rows = await session.execute(
-        select(SalesInvoiceItem, Product.name, Product.sku)
+        select(SalesInvoiceItem, Product.name, Product.sku, Product.hsn_code, Unit.code)
         .join(Product, Product.id == SalesInvoiceItem.product_id)
+        .join(Unit, Unit.id == Product.base_unit_id)
         .where(SalesInvoiceItem.sales_invoice_id == invoice.id)
         .order_by(SalesInvoiceItem.created_at)
+    )
+    payment_rows = await session.execute(
+        select(Payment.method, PaymentAllocation.amount, Payment.reference)
+        .join(PaymentAllocation, PaymentAllocation.payment_id == Payment.id)
+        .where(PaymentAllocation.sales_invoice_id == invoice.id)
+        .order_by(Payment.received_at)
     )
     return InvoiceDetail(
         **_to_list_item(invoice, customer_name, warehouse_name, actor).model_dump(),
@@ -238,11 +271,17 @@ async def get_invoice(
         discount_total=invoice.discount_total,
         tax_total=invoice.tax_total,
         customer_id=invoice.customer_id,
+        customer_phone=phone,
+        customer_gstin=gstin,
+        customer_address=address,
+        customer_village=village,
         items=[
             InvoiceItemOut(
                 product_id=item.product_id,
                 product_name=name,
                 sku=sku,
+                hsn_code=hsn,
+                unit_code=unit_code,
                 base_quantity=item.base_quantity,
                 unit_price=item.unit_price,
                 price_source=item.price_source,
@@ -252,7 +291,11 @@ async def get_invoice(
                 tax_amount=item.tax_amount,
                 line_total=item.line_total,
             )
-            for item, name, sku in item_rows.all()
+            for item, name, sku, hsn, unit_code in item_rows.all()
+        ],
+        payments=[
+            InvoicePaymentOut(method=method, amount=amount, reference=reference)
+            for method, amount, reference in payment_rows.all()
         ],
     )
 

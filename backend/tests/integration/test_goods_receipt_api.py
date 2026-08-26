@@ -103,7 +103,7 @@ async def test_goods_receipt_increases_stock_with_landed_cost(api: AsyncClient) 
 
 async def test_goods_receipt_requires_permission(api: AsyncClient) -> None:
     ids = await _seed()
-    # An accountant lacks purchase.create.
+    # Counter staff lack purchase.create.
     factory = get_sessionmaker()
     async with factory() as session:
         await OrganizationProvisioningService(session).create_user(
@@ -111,7 +111,7 @@ async def test_goods_receipt_requires_permission(api: AsyncClient) -> None:
             email="acc@gr.local",
             password="AccPass1234",
             full_name="Acc",
-            role_code="accountant",
+            role_code="counter_sales",
             branch_id=None,
         )
         await session.commit()

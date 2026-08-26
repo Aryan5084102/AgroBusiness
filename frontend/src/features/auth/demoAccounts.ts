@@ -11,13 +11,8 @@ export interface DemoAccount {
 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
   { email: 'owner@agriflow.local', label: 'Owner (full access)' },
-  { email: 'admin@agriflow.local', label: 'Administrator' },
-  { email: 'billing@agriflow.local', label: 'Billing Operator' },
-  { email: 'sales@agriflow.local', label: 'Wholesale Salesperson' },
-  { email: 'inventory@agriflow.local', label: 'Inventory Manager' },
-  { email: 'accountant@agriflow.local', label: 'Accountant' },
-  { email: 'technician@agriflow.local', label: 'Service Technician' },
-  { email: 'auditor@agriflow.local', label: 'Auditor (read-only)' },
+  { email: 'counter@agriflow.local', label: 'Counter / Sales' },
+  { email: 'store@agriflow.local', label: 'Store / Inventory' },
 ];
 
 // Hosted demos are production builds, so NODE_ENV alone can never reveal the

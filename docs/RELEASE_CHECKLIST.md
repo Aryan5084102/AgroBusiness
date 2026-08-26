@@ -37,5 +37,5 @@
 - [ ] Audit log records the login.
 
 ## Sign-off
-- [ ] Accountant reviewed GST/tax outputs.
+- [ ] Owner reviewed GST/tax outputs.
 - [ ] Owner approved go-live.

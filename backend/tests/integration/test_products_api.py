@@ -76,8 +76,9 @@ async def test_create_list_and_search_products(api: AsyncClient) -> None:
 
 
 async def test_products_requires_permission(api: AsyncClient) -> None:
-    await _seed()
-    # Create an accountant (whose role lacks product.view).
+    _, _, cat_id, unit_id = await _seed()
+    # Counter staff can read the catalogue but must not edit it — product.create
+    # and product.update belong to the store/inventory role.
     factory = get_sessionmaker()
     async with factory() as session:
         from app.modules.organizations.models import Organization
@@ -91,18 +92,29 @@ async def test_products_requires_permission(api: AsyncClient) -> None:
         assert org is not None
         await OrganizationProvisioningService(session).create_user(
             organization_id=org.id,
-            email="acc@cat.local",
-            password="AccPass1234",
-            full_name="Accountant",
-            role_code="accountant",
+            email="counter@cat.local",
+            password="CounterPass1234",
+            full_name="Counter Staff",
+            role_code="counter_sales",
             branch_id=None,
         )
         await session.commit()
 
     await api.post(
         "/api/v1/auth/login",
-        json={"email": "acc@cat.local", "password": "AccPass1234"},
+        json={"email": "counter@cat.local", "password": "CounterPass1234"},
     )
-    # accountant lacks product.view.
-    resp = await api.get("/api/v1/products")
+    # Reading the catalogue is part of billing, so this must succeed.
+    assert (await api.get("/api/v1/products")).status_code == 200
+    # Creating one is not: counter_sales holds no product.create.
+    resp = await api.post(
+        "/api/v1/products",
+        json={
+            "name": "Sneaky Seed",
+            "sku": "SNEAK-1",
+            "category_id": str(cat_id),
+            "base_unit_id": str(unit_id),
+            "retail_price": "10",
+        },
+    )
     assert resp.status_code == 403

@@ -23,7 +23,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", str(get_settings().database_url))
+# Deliberately NOT config.set_main_option(): alembic stores that in a
+# configparser with interpolation enabled, which rejects the '%' in a
+# percent-encoded unix-socket path (…?host=%2Fvar%2Frun%2Fpostgresql). Passing
+# the URL around directly keeps socket connections working.
+DATABASE_URL = str(get_settings().database_url)
 
 target_metadata = Base.metadata
 
@@ -31,7 +35,7 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """Run migrations without a live DB connection (emits SQL)."""
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
@@ -54,8 +58,10 @@ def _do_run_migrations(connection: Connection) -> None:
 
 async def run_migrations_online() -> None:
     """Run migrations against a live async database connection."""
+    section = dict(config.get_section(config.config_ini_section, {}))
+    section["sqlalchemy.url"] = DATABASE_URL
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

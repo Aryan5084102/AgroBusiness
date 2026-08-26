@@ -5,9 +5,9 @@ Production-grade wholesale **and** retail ERP for an agricultural-input business
 one FastAPI backend + one PostgreSQL database, one Next.js frontend.
 
 > **Status: feature-complete and verified end to end on real Postgres.**
-> 97 backend tests, ruff + mypy strict clean, 8 migrations zero-drift; frontend
+> 97 backend tests, ruff + mypy strict clean, 9 migrations zero-drift; frontend
 > prettier/eslint/tsc/vitest clean and building; 28 Playwright specs walk **every
-> screen as every one of the 8 roles** against a production build, plus the
+> screen as every one of the 3 roles** against a production build, plus the
 > money paths (a counter sale, a stock correction, a collection), on Chromium
 > and Firefox.
 > The full buy→stock→sell→collect→service spine works end to end for retail and
@@ -98,8 +98,68 @@ pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 Screens: `/` (landing + login), `/status` (live system status), plus the
 authenticated app — `/dashboard`, `/sales` (retail counter), `/wholesale`,
 `/invoices`, `/customers`, `/collections`, `/products`, `/inventory`,
-`/purchases`, `/service`, `/reports`, `/accounting`, `/audit`, `/settings`.
+`/purchases`, `/service`, `/reports`, `/accounting`, `/audit`, `/settings`, plus
+`/invoices/:id/bill` — the printable GST tax invoice.
 Which of these a person sees is decided by their role.
+
+### The retail counter
+
+The counter works top to bottom: who is buying, then what they are buying, then
+the money. **Customer name** and **mobile number** are required — they are what
+the bill prints and what a khata is kept under — and the address is optional.
+Typing a mobile already on file recognises that customer, fills in what the shop
+knows, and attaches the sale to their existing account instead of opening a
+second one; a new number is saved as a `walk_in` customer, coded `RC-<mobile>`.
+Then pick a warehouse, add items, and take payment.
+
+Ticking **Sale on credit (khata)** reveals an amount-taken-now box — leave it at
+0 and the whole bill becomes a receivable against that same customer. A khata
+sale answers to the same credit limit as a dealer order
+(`SalesService._enforce_credit_limit`, mirroring the wholesale rule); a customer
+with `credit_limit = 0` is treated as having no limit set, which is what a
+counter-created customer starts with. Dealers with a real limit are still set up
+one at a time via **New dealer** on the wholesale screen or the Customers screen.
+
+### The bill
+
+Taking payment downloads the bill as a PDF straight away — the counter never has
+to ask for it. `frontend/src/features/invoices/invoicePdf.ts` draws the A4 tax
+invoice client-side (seller and buyer blocks, HSN/quantity/rate lines, a
+rate-wise CGST/SGST summary, the total in words, a signature block) on top of
+`src/lib/pdf/pdfDocument.ts`, a small hand-rolled PDF writer, so no PDF library
+or server round-trip is involved. It uses the base-14 Helvetica faces, which are
+Latin-1 only: amounts read `Rs.` rather than `₹`, and a name in Devanagari cannot
+be drawn.
+
+The same invoice also has a web document at `/invoices/:id/bill`, which renders
+any script and is reachable from the counter's receipt strip and from any row of
+the invoice list. It renders outside `AppShell` so printing needs no
+chrome-stripping — "Save as PDF" in the browser's print dialog gives a clean
+one-page bill named after the invoice number. Both documents share their tax
+maths (`features/invoices/gst.ts`) so they cannot disagree.
+
+CGST/SGST are shown as equal halves of the stored GST, i.e. an intra-state
+supply. There is no place-of-supply field yet, so an inter-state sale needing
+IGST is not modelled.
+
+### Roles
+
+The shop runs on three roles, defined in `backend/app/core/permissions.py`:
+
+| Role | Who | Can |
+| ---- | --- | --- |
+| **Owner** | the proprietor | everything — cost & margin, profit, books, repairs, users, settings, audit trail |
+| **Counter / Sales** | counter staff | retail billing *and* wholesale/dealer orders, invoices, customers, collections; read-only catalogue and stock |
+| **Store / Inventory** | godown keeper | products, stock adjustments and transfers, purchases and goods receipt |
+
+Retail and wholesale are one role on purpose: the same person works both
+counters, and the API guards both with `sales.create`. Nothing but Owner holds
+`pricing.view_cost`, `report.view_profit`, `settings.manage` or `audit.view`, so
+no staff account can see a margin or change how the shop is configured.
+
+Roles are per-organization rows seeded from `DEFAULT_ROLES` at provisioning
+time, so changing that table needs a migration for databases that already
+exist — see `c9f1a70b34d2_phase9_collapse_roles_to_three.py`.
 
 ## Environment variables
 
@@ -119,12 +179,12 @@ Run locally and passing:
 - **Backend** — `ruff` ✓, `ruff format --check` ✓, `mypy app` (strict) ✓,
   `pytest` ✓ (**97 tests**: unit + Hypothesis property tests + integration
   against a real PostgreSQL database, incl. a two-writer concurrency test),
-  8 Alembic migrations apply from scratch (47 tables) with **zero drift**
+  9 Alembic migrations apply from scratch (47 tables) with **zero drift**
   (`alembic check`), demo seed runs, and the auth flow was smoke-tested
   end-to-end over HTTP (login → session cookie → `/me`).
 - **Frontend** — `prettier --check` ✓, `next lint` ✓, `tsc --noEmit` ✓,
   `vitest` ✓, `next build` ✓.
-- **End to end** — `e2e/roles.spec.ts` signs in as each of the 8 demo roles and
+- **End to end** — `e2e/roles.spec.ts` signs in as each of the 3 demo roles and
   asserts that every screen the role covers renders real content, that screens
   outside the role are refused, and that the sidebar offers exactly the former
   and none of the latter. `e2e/flows.spec.ts` drives the money paths through the

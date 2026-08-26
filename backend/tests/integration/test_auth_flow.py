@@ -87,38 +87,38 @@ async def test_owner_can_list_users_and_create_one(app_client: AsyncClient) -> N
     created = await app_client.post(
         "/api/v1/users",
         json={
-            "email": "billing@agriflow.local",
-            "password": "BillingPass1",
-            "full_name": "Billing Clerk",
-            "role_code": "billing_operator",
+            "email": "counter@agriflow.local",
+            "password": "CounterPass1",
+            "full_name": "Counter Staff",
+            "role_code": "counter_sales",
         },
     )
     assert created.status_code == 201, created.text
 
 
-async def test_billing_operator_cannot_manage_users(app_client: AsyncClient) -> None:
-    # Owner creates a billing operator.
+async def test_counter_staff_cannot_manage_users(app_client: AsyncClient) -> None:
+    # Owner creates a counter user.
     await app_client.post("/api/v1/auth/login", json={"email": OWNER_EMAIL, "password": OWNER_PW})
     await app_client.post(
         "/api/v1/users",
         json={
-            "email": "billing@agriflow.local",
-            "password": "BillingPass1",
-            "full_name": "Billing Clerk",
-            "role_code": "billing_operator",
+            "email": "counter@agriflow.local",
+            "password": "CounterPass1",
+            "full_name": "Counter Staff",
+            "role_code": "counter_sales",
         },
     )
     await app_client.post("/api/v1/auth/logout")
 
-    # Log in as the billing operator (fresh client to drop cookies).
+    # Log in as the counter user (fresh client to drop cookies).
     app = create_app()
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as billing:
-        await billing.post(
+    async with AsyncClient(transport=transport, base_url="http://test") as counter:
+        await counter.post(
             "/api/v1/auth/login",
-            json={"email": "billing@agriflow.local", "password": "BillingPass1"},
+            json={"email": "counter@agriflow.local", "password": "CounterPass1"},
         )
-        resp = await billing.get("/api/v1/users")
+        resp = await counter.get("/api/v1/users")
         assert resp.status_code == 403
         assert resp.json()["error"]["code"] == "permission_denied"
 

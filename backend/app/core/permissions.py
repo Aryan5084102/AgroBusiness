@@ -52,54 +52,37 @@ class RoleSpec(TypedDict):
     permissions: list[str]
 
 
+# The shop runs on three roles: the owner, whoever is on the counter, and
+# whoever keeps the godown. Everything the owner does alone — books, profit,
+# cost price, users, settings, the audit trail — stays with the owner, so no
+# staff role can see a margin or change a setting.
+#
 # Owner is handled specially (implicit all-permissions) but also seeded here.
 DEFAULT_ROLES: dict[str, RoleSpec] = {
     "owner": {
         "name": "Owner",
         "permissions": ALL_PERMISSION_CODES,
     },
-    "administrator": {
-        "name": "Administrator",
-        "permissions": [
-            "product.view",
-            "product.create",
-            "product.update",
-            "inventory.view",
-            "purchase.view",
-            "purchase.create",
-            "sales.create",
-            "customer.view",
-            "customer.create",
-            "report.view",
-            "user.manage",
-            "settings.manage",
-        ],
-    },
-    "billing_operator": {
-        "name": "Billing Operator",
+    # One counter role covers both halves of the shop: walk-in retail billing
+    # and dealer/wholesale orders. `sales.finalize` is included so the counter
+    # can dispatch a wholesale order end-to-end without the owner; revoke it
+    # from this role if dispatch should stay an owner decision.
+    "counter_sales": {
+        "name": "Counter / Sales",
         "permissions": [
             "product.view",
             "inventory.view",
             "sales.create",
+            "sales.finalize",
             "customer.view",
             "customer.create",
             "payment.receive",
         ],
     },
-    "wholesale_salesperson": {
-        "name": "Wholesale Salesperson",
-        "permissions": [
-            "product.view",
-            "inventory.view",
-            "sales.create",
-            "customer.view",
-            "customer.create",
-            "payment.receive",
-            "report.view",
-        ],
-    },
-    "inventory_manager": {
-        "name": "Inventory Manager",
+    # Godown side: what comes in, what is on hand, what is about to expire.
+    # Deliberately no sales and no payments — stock and cash stay separate.
+    "store_inventory": {
+        "name": "Store / Inventory",
         "permissions": [
             "product.view",
             "product.create",
@@ -109,31 +92,6 @@ DEFAULT_ROLES: dict[str, RoleSpec] = {
             "stock.transfer",
             "purchase.view",
             "purchase.create",
-        ],
-    },
-    "accountant": {
-        "name": "Accountant",
-        "permissions": [
-            "payment.receive",
-            "report.view",
-            "report.view_profit",
-            "customer.view",
-        ],
-    },
-    "service_technician": {
-        "name": "Service Technician",
-        "permissions": ["service.manage", "inventory.view", "product.view"],
-    },
-    "auditor": {
-        "name": "Auditor",
-        "permissions": [
-            "product.view",
-            "inventory.view",
-            "purchase.view",
-            "customer.view",
-            "report.view",
-            "report.view_profit",
-            "audit.view",
         ],
     },
 }

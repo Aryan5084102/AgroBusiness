@@ -13,6 +13,10 @@ const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
   testDir: './e2e',
+  // The per-role sweep opens fourteen screens in one test; against `next dev`
+  // each route compiles on first hit, which puts it right on Playwright's 30s
+  // default. Sixty gives it room without masking a genuinely hung page.
+  timeout: 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

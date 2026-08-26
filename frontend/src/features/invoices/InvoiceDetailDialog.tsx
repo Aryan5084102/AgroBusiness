@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
@@ -16,9 +17,12 @@ interface InvoiceDetailDialogProps {
   onClose: () => void;
 }
 
-/** Read-only invoice view with its per-line pricing snapshot. Printing uses the
- * browser's own dialog against a print stylesheet — no PDF service needed. */
+/** Read-only invoice view with its per-line pricing snapshot — the internal
+ * view, including how each price was resolved. The customer-facing document
+ * lives at `/invoices/:id/bill`, which prints on its own without the app
+ * chrome around it. */
 export function InvoiceDetailDialog({ invoiceId, onClose }: InvoiceDetailDialogProps) {
+  const router = useRouter();
   const invoice = useInvoice(invoiceId);
   const detail = invoice.data;
 
@@ -38,8 +42,13 @@ export function InvoiceDetailDialog({ invoiceId, onClose }: InvoiceDetailDialogP
           <Button variant="ghost" onClick={onClose}>
             Close
           </Button>
-          <Button variant="secondary" icon="print" onClick={() => window.print()}>
-            Print
+          <Button
+            variant="secondary"
+            icon="print"
+            disabled={!invoiceId}
+            onClick={() => router.push(`/invoices/${invoiceId}/bill`)}
+          >
+            Open bill
           </Button>
         </>
       }

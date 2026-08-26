@@ -14,6 +14,7 @@ import { SearchInput, Toolbar, ToolbarSpacer } from '@/components/ui/Toolbar';
 import { Tabs } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/Toast';
 import { usePermissions } from '@/features/auth/usePermissions';
+import { CustomerDialog } from '@/features/customers/CustomerDialog';
 import { useCustomers } from '@/features/customers/useCustomers';
 import { ProductPicker } from '@/features/pos/ProductPicker';
 import { useCart } from '@/features/pos/useCart';
@@ -73,6 +74,10 @@ function OrderBuilder({
 
   const [warehouseId, setWarehouseId] = useState('');
   const [customerId, setCustomerId] = useState('');
+  // A dealer's name, address and phone are captured here, one dealer at a
+  // time, rather than sending the salesperson to the Customers screen
+  // mid-order.
+  const [addingCustomer, setAddingCustomer] = useState(false);
   const [isQuotation, setIsQuotation] = useState(false);
   const [creditBlocked, setCreditBlocked] = useState(false);
   const [override, setOverride] = useState(false);
@@ -159,7 +164,30 @@ function OrderBuilder({
                   </option>
                 ))}
               </Select>
+              <Button
+                variant="secondary"
+                icon="plus"
+                className={styles.newDealer}
+                onClick={() => setAddingCustomer(true)}
+              >
+                New dealer
+              </Button>
             </div>
+
+            {selectedCustomer &&
+            (selectedCustomer.address ||
+              selectedCustomer.village ||
+              selectedCustomer.phone) ? (
+              <p className={styles.dealerContact}>
+                {[
+                  selectedCustomer.address,
+                  selectedCustomer.village,
+                  selectedCustomer.phone,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            ) : null}
 
             {selectedCustomer ? (
               <dl className={styles.credit}>
@@ -294,6 +322,12 @@ function OrderBuilder({
           </div>
         </CardBody>
       </Card>
+
+      <CustomerDialog
+        open={addingCustomer}
+        customer={null}
+        onClose={() => setAddingCustomer(false)}
+      />
     </div>
   );
 }

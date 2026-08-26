@@ -27,9 +27,13 @@ export function useCart() {
   }, []);
 
   const setQuantity = useCallback((productId: string, quantity: number) => {
+    // A blank or half-typed quantity box yields NaN. Left alone it would be
+    // sent as `"NaN"` and the server would refuse to price the whole cart, so
+    // it is treated as a removal — the same as clearing the line.
+    const next = Number.isFinite(quantity) ? Math.floor(quantity) : 0;
     setItems((prev) =>
       prev
-        .map((i) => (i.productId === productId ? { ...i, quantity } : i))
+        .map((i) => (i.productId === productId ? { ...i, quantity: next } : i))
         .filter((i) => i.quantity > 0),
     );
   }, []);

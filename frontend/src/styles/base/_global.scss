@@ -99,9 +99,22 @@ textarea {
   color: var(--color-text-muted);
 }
 
+// A4 with a comfortable margin: the bill draws to the edge of this box, so it
+// must not add a page margin of its own on top.
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
 // Print: strip the app chrome so invoices and reports come out clean.
 @media print {
   .no-print {
     display: none !important;
+  }
+
+  // The app's tinted background would print as a grey wash on every sheet.
+  html,
+  body {
+    background: #fff;
   }
 }

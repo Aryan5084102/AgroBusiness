@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -172,6 +173,21 @@ export function InvoicesScreen() {
                 header: 'Total',
                 numeric: true,
                 render: (row) => <strong>{formatCurrency(row.grand_total)}</strong>,
+              },
+              {
+                key: 'bill',
+                header: '',
+                // stopPropagation: the row itself opens the detail dialog, and
+                // a click here means "give me the printable bill" instead.
+                render: (row) => (
+                  <Link
+                    href={`/invoices/${row.id}/bill`}
+                    className={styles.billLink}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    Bill
+                  </Link>
+                ),
               },
             ]}
           />

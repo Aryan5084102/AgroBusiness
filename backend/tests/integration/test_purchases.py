@@ -209,12 +209,12 @@ async def test_supplier_endpoint_requires_permission(api: AsyncClient) -> None:
             email="billing@perm.local",
             password="BillingPass1",
             full_name="Billing",
-            role_code="billing_operator",
+            role_code="counter_sales",
             branch_id=prov.branch.id,
         )
         await session.commit()
 
-    # Billing operator lacks purchase.view -> 403.
+    # Counter staff lack purchase.view -> 403.
     await api.post(
         "/api/v1/auth/login",
         json={"email": "billing@perm.local", "password": "BillingPass1"},

@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.money import Money
@@ -29,6 +29,7 @@ from app.modules.accounting.service import (
     JournalLine,
 )
 from app.modules.catalogue.models import Product
+from app.modules.customers.models import Customer
 from app.modules.idempotency.service import IdempotencyService
 from app.modules.inventory.models import MovementType
 from app.modules.inventory.service import InventoryService
@@ -289,6 +290,14 @@ class SalesService:
             raise BusinessRuleError(
                 "Walk-in sales must be paid in full.", code="walk_in_credit_not_allowed"
             )
+        # A counter sale left on khata is a receivable exactly like a dealer
+        # order, so it answers to the same credit limit. Without this the limit
+        # would apply on the wholesale screen and quietly not at the counter.
+        if customer_id is not None and paid_amount < invoice.grand_total:
+            await self._enforce_credit_limit(
+                customer_id=customer_id,
+                unpaid=invoice.grand_total - paid_amount,
+            )
 
         for p in payments:
             payment = Payment(
@@ -384,6 +393,43 @@ class SalesService:
             source_document_id=invoice.id,
             created_by=created_by,
         )
+
+    async def _enforce_credit_limit(self, *, customer_id: uuid.UUID, unpaid: Decimal) -> None:
+        """Refuse a counter credit sale that would breach the customer's limit.
+
+        Mirrors ``WholesaleService._enforce_credit_limit``. A customer with no
+        limit configured (0) is treated as unlimited, the same as on the
+        wholesale side, so this only bites where a limit was deliberately set.
+        """
+        customer = await self._session.get(Customer, customer_id)
+        if customer is None:
+            raise NotFoundError("Unknown customer.")
+        if customer.credit_limit <= 0:
+            return
+
+        outstanding = Decimal(
+            str(
+                (
+                    await self._session.execute(
+                        select(
+                            func.coalesce(
+                                func.sum(SalesInvoice.grand_total - SalesInvoice.paid_amount),
+                                0,
+                            )
+                        ).where(
+                            SalesInvoice.customer_id == customer_id,
+                            SalesInvoice.payment_status != PaymentStatus.PAID,
+                        )
+                    )
+                ).scalar()
+            )
+        )
+        if outstanding + unpaid > customer.credit_limit:
+            raise BusinessRuleError(
+                f"{customer.name} would go over their credit limit of "
+                f"{customer.credit_limit}. Outstanding is {outstanding}.",
+                code="credit_limit_exceeded",
+            )
 
     @staticmethod
     def _derive_status(paid: Decimal, total: Decimal) -> PaymentStatus:

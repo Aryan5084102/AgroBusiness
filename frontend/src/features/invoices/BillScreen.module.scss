@@ -1,0 +1,64 @@
+// Screen frame around the printable bill: a toolbar and a page-like sheet on a
+// tinted backdrop. Everything here is chrome — the bill itself brings its own
+// A4 geometry, and print strips this frame back to nothing.
+
+.page {
+  min-height: 100vh;
+  padding: var(--space-5) var(--space-4) var(--space-10);
+  background: var(--color-bg-secondary);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 210mm;
+  max-width: 100%;
+  margin: 0 auto var(--space-4);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.sheet {
+  width: 210mm;
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.hint {
+  width: 210mm;
+  max-width: 100%;
+  margin: var(--space-4) auto 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+@media print {
+  // Strip the frame so only the bill reaches the paper. `.no-print` already
+  // removes the toolbar and the hint; these rules drop the backdrop, the
+  // rounded card and the fixed A4 width that would otherwise re-impose a
+  // margin inside @page's own.
+  .page {
+    min-height: 0;
+    padding: 0;
+    background: none;
+  }
+
+  .sheet {
+    width: auto;
+    margin: 0;
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+}

@@ -1,0 +1,395 @@
+// The printable tax invoice.
+//
+// Sized in millimetres so the on-screen document is the same object that comes
+// out of the printer — A4 width, with the print rules at the bottom removing
+// only the page's own frame. Nothing here relies on shadows or background
+// colour for contrast, because printers routinely drop both.
+
+.bill {
+  --rule: #d5ded8;
+  --rule-strong: #9aaba1;
+
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 14mm 14mm 12mm;
+  display: flex;
+  flex-direction: column;
+  gap: 7mm;
+  background: #fff;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- masthead ------------------------------------------------------------ */
+
+.masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-primary-forest, #14362d);
+}
+
+.sellerName {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-primary-forest, #14362d);
+}
+
+.sellerLine {
+  color: var(--color-text-secondary);
+  max-width: 78mm;
+}
+
+.sellerGstin {
+  margin-top: 3px;
+
+  strong {
+    font-weight: 650;
+    letter-spacing: 0.02em;
+  }
+}
+
+.docMeta {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.docType {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.docNumber {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--space-2);
+}
+
+.metaList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  > div {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  dt {
+    color: var(--color-text-muted);
+  }
+
+  dd {
+    min-width: 24mm;
+    text-align: right;
+    font-weight: 600;
+  }
+}
+
+.capitalize {
+  text-transform: capitalize;
+}
+
+.status {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid currentcolor;
+}
+
+.statusPaid {
+  color: var(--color-success);
+}
+
+.statusDue {
+  color: var(--color-danger);
+}
+
+/* --- parties ------------------------------------------------------------- */
+
+.parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+.party {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--rule);
+}
+
+.partyLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 3px;
+}
+
+.partyName {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.partyLine {
+  color: var(--color-text-secondary);
+  // A postal address arrives as typed, newlines and all.
+  white-space: pre-line;
+}
+
+/* --- line items ---------------------------------------------------------- */
+
+.lines {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead th {
+    padding: var(--space-2) var(--space-2);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--color-text-secondary);
+    border-bottom: 1.5px solid var(--rule-strong);
+  }
+
+  tbody td {
+    padding: var(--space-2);
+    vertical-align: top;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  // Keep a line from splitting across two printed pages.
+  tbody tr {
+    break-inside: avoid;
+  }
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.colIndex {
+  width: 7mm;
+  color: var(--color-text-muted);
+}
+
+.colHsn {
+  width: 18mm;
+  color: var(--color-text-secondary);
+}
+
+.itemName {
+  display: block;
+  font-weight: 600;
+}
+
+.itemSku {
+  display: block;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+.unit {
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+.lineTotal {
+  font-weight: 650;
+}
+
+/* --- summary ------------------------------------------------------------- */
+
+.summary {
+  display: grid;
+  grid-template-columns: 1fr minmax(62mm, auto);
+  gap: var(--space-6);
+  align-items: start;
+  break-inside: avoid;
+}
+
+.blockLabel {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.rates {
+  // Capped rather than full-width: three short money columns spread across the
+  // whole left half read as a gap, not a table.
+  width: 100%;
+  max-width: 88mm;
+  border-collapse: collapse;
+
+  th {
+    padding: 3px var(--space-2);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  td {
+    padding: 3px var(--space-2);
+    border-bottom: 1px solid var(--rule);
+  }
+}
+
+.totals {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  > div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-5);
+  }
+
+  dt {
+    color: var(--color-text-secondary);
+  }
+
+  dd {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+}
+
+.grand {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1.5px solid var(--rule-strong);
+
+  dt {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  dd {
+    font-size: 17px;
+    font-weight: 700;
+  }
+}
+
+.due {
+  dt,
+  dd {
+    color: var(--color-danger);
+    font-weight: 700;
+  }
+}
+
+/* --- closing ------------------------------------------------------------- */
+
+.wordsValue {
+  display: block;
+}
+
+.words {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  break-inside: avoid;
+}
+
+.paidBy {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.paidByLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-8);
+  // Pin the signature to the bottom of the sheet however short the bill is.
+  margin-top: auto;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--rule);
+  break-inside: avoid;
+}
+
+.terms {
+  max-width: 105mm;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+.sign {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.signFor {
+  font-weight: 650;
+}
+
+.signLine {
+  margin-top: 16mm;
+  padding-top: 3px;
+  border-top: 1px solid var(--rule-strong);
+  font-size: 10.5px;
+  color: var(--color-text-secondary);
+}
+
+/* --- print --------------------------------------------------------------- */
+
+@media print {
+  .bill {
+    width: auto;
+    // A4 (297mm) less @page's 12mm margins, with a few mm of headroom so
+    // rounding cannot tip a one-page bill onto a blank second sheet. Keeps the
+    // signature block pinned to the foot of the paper, where it belongs.
+    min-height: 268mm;
+    margin: 0;
+    // @page owns the paper margin; keeping it here too would double it.
+    padding: 0;
+  }
+
+  // Printers drop backgrounds by default, which would leave this panel's text
+  // floating. The border carries it instead.
+  .words {
+    background: transparent;
+  }
+}

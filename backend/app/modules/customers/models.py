@@ -43,6 +43,9 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, VersionMixin, Base):
     )
     phone: Mapped[str | None] = mapped_column(String(20), index=True)
     gstin: Mapped[str | None] = mapped_column(String(20))
+    # Postal address for the tax invoice's "billed to" block. `village` stays
+    # alongside it as the short local identifier the counter recognises.
+    address: Mapped[str | None] = mapped_column(String(400))
     village: Mapped[str | None] = mapped_column(String(120))
     credit_limit: Mapped[Decimal] = mapped_column(
         Numeric(16, 2), default=Decimal("0"), nullable=False

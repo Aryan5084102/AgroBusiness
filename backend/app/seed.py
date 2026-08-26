@@ -50,14 +50,12 @@ DEMO_PASSWORD = "AgriFlow@123"  # documented development-only password
 ORG_NAME = "AgriFlow Demo Traders"
 OWNER_EMAIL = "owner@agriflow.local"
 
+# Two staff accounts, matching the two staff roles. Everything else in the shop
+# — books, profit, repairs, settings — belongs to the owner, so the owner
+# account is the actor behind that seeded history rather than a stand-in user.
 DEMO_USERS = [
-    ("admin@agriflow.local", "Admin User", "administrator"),
-    ("billing@agriflow.local", "Billing Operator", "billing_operator"),
-    ("inventory@agriflow.local", "Inventory Manager", "inventory_manager"),
-    ("accountant@agriflow.local", "Accountant", "accountant"),
-    ("sales@agriflow.local", "Wholesale Salesperson", "wholesale_salesperson"),
-    ("technician@agriflow.local", "Service Technician", "service_technician"),
-    ("auditor@agriflow.local", "Auditor", "auditor"),
+    ("counter@agriflow.local", "Counter Staff", "counter_sales"),
+    ("store@agriflow.local", "Store Keeper", "store_inventory"),
 ]
 
 # (name, sku, kind, retail, wholesale, mrp, gst%, opening stock, tracks_batches)
@@ -573,14 +571,14 @@ async def _seed_notifications_and_audit(
     notifications = NotificationService(session)
     await notifications.create(
         organization_id=org_id,
-        user_id=users["inventory@agriflow.local"].id,
+        user_id=users["store@agriflow.local"].id,
         type="low_stock",
         title="Stock below minimum",
         body="Knapsack Sprayer 16L has fallen below its reorder level.",
     )
     await notifications.create(
         organization_id=org_id,
-        user_id=users["accountant@agriflow.local"].id,
+        user_id=users[OWNER_EMAIL].id,
         type="receivable",
         title="Dealer balance outstanding",
         body="Green Agro Dealers still owes money on a dispatched order.",
@@ -692,7 +690,7 @@ async def seed(reset: bool = False) -> None:
             branch_id,
             products,
             suppliers,
-            users["inventory@agriflow.local"].id,
+            users["store@agriflow.local"].id,
         )
         await _seed_retail_history(
             session,
@@ -701,7 +699,7 @@ async def seed(reset: bool = False) -> None:
             branch_id,
             products,
             customers,
-            users["billing@agriflow.local"].id,
+            users["counter@agriflow.local"].id,
         )
         await _seed_wholesale(
             session,
@@ -710,9 +708,9 @@ async def seed(reset: bool = False) -> None:
             branch_id,
             products,
             customers,
-            users["sales@agriflow.local"].id,
+            users["counter@agriflow.local"].id,
         )
-        await _seed_collections(session, org_id, customers, users["accountant@agriflow.local"].id)
+        await _seed_collections(session, org_id, customers, users[OWNER_EMAIL].id)
         await _seed_service_jobs(
             session,
             org_id,
@@ -720,7 +718,7 @@ async def seed(reset: bool = False) -> None:
             branch_id,
             products,
             customers,
-            users["technician@agriflow.local"].id,
+            users[OWNER_EMAIL].id,
         )
         await _seed_notifications_and_audit(session, org_id, users)
 

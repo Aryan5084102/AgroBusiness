@@ -11,6 +11,7 @@ export interface Customer {
   customer_type: CustomerType;
   phone: string | null;
   gstin: string | null;
+  address: string | null;
   village: string | null;
   credit_limit: string;
   credit_period_days: number;
@@ -25,6 +26,7 @@ export interface CreateCustomerInput {
   customer_type: CustomerType;
   phone?: string;
   gstin?: string;
+  address?: string;
   village?: string;
   credit_limit?: string;
   credit_period_days?: number;
@@ -35,6 +37,7 @@ export interface UpdateCustomerInput {
   customer_type?: CustomerType;
   phone?: string;
   gstin?: string;
+  address?: string;
   village?: string;
   credit_limit?: string;
   credit_period_days?: number;

@@ -61,7 +61,7 @@ export function CustomersPanel() {
       <Card>
         <CardHeader
           title="Customers & dealers"
-          description="Walk-ins, farmers, retailers and dealers. Credit limits are enforced when a wholesale order is confirmed."
+          description="Farmers, retailers and dealers. A credit limit is enforced both when a wholesale order is confirmed and when a counter sale goes on khata."
           actions={
             canCreate ? (
               <Button size="sm" icon="plus" onClick={() => setCreating(true)}>

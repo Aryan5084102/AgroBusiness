@@ -24,6 +24,18 @@
   flex-wrap: wrap;
 }
 
+// Aligns with the bottom of the Select beside it, not its label.
+.newDealer {
+  align-self: end;
+}
+
+.dealerContact {
+  margin-top: var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: pre-line;
+}
+
 .credit {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));

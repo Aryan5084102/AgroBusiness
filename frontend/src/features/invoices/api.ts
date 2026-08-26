@@ -22,6 +22,8 @@ export interface InvoiceItem {
   product_id: string;
   product_name: string;
   sku: string;
+  hsn_code: string | null;
+  unit_code: string;
   base_quantity: string;
   unit_price: string;
   price_source: string;
@@ -32,12 +34,23 @@ export interface InvoiceItem {
   line_total: string;
 }
 
+export interface InvoicePayment {
+  method: 'cash' | 'upi' | 'card' | 'cheque' | 'bank_transfer' | 'credit';
+  amount: string;
+  reference: string | null;
+}
+
 export interface InvoiceDetail extends InvoiceListItem {
   subtotal: string;
   discount_total: string;
   tax_total: string;
   customer_id: string | null;
+  customer_phone: string | null;
+  customer_gstin: string | null;
+  customer_address: string | null;
+  customer_village: string | null;
   items: InvoiceItem[];
+  payments: InvoicePayment[];
 }
 
 export interface InvoicePage {
