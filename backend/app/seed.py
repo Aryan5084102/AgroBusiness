@@ -18,11 +18,12 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import Base, get_engine, get_sessionmaker
+from app.core.security import hash_password, verify_password
 from app.modules.audit.service import AuditService
 from app.modules.catalogue.models import (
     Category,
@@ -35,7 +36,7 @@ from app.modules.customers.models import Customer, CustomerType
 from app.modules.inventory.models import Batch, MovementType
 from app.modules.inventory.service import InventoryService
 from app.modules.notifications.service import NotificationService
-from app.modules.organizations.models import Organization, Warehouse, WarehouseType
+from app.modules.organizations.models import Branch, Organization, Warehouse, WarehouseType
 from app.modules.organizations.service import OrganizationProvisioningService
 from app.modules.payments.models import PaymentMethod
 from app.modules.purchases.service import PurchaseService, ReceiptCharges, ReceiptLineInput
@@ -44,7 +45,7 @@ from app.modules.sales.wholesale_service import OrderLineInput, WholesaleService
 from app.modules.service_jobs.models import RepairStatus
 from app.modules.service_jobs.service import ServiceJobService
 from app.modules.suppliers.models import Supplier
-from app.modules.users.models import User
+from app.modules.users.models import Role, User, UserBranch, UserRole
 
 DEMO_PASSWORD = "AgriFlow@123"  # documented development-only password
 ORG_NAME = "AgriFlow Demo Traders"
@@ -56,6 +57,28 @@ OWNER_EMAIL = "owner@agriflow.local"
 DEMO_USERS = [
     ("counter@agriflow.local", "Counter Staff", "counter_sales"),
     ("store@agriflow.local", "Store Keeper", "store_inventory"),
+]
+
+# Databases seeded before the roles collapsed to three still carry the original
+# staff emails. Migration c9f1a70b34d2 renamed the *role* rows in place, so those
+# accounts kept working — under emails the login page no longer offers, which is
+# why counter@/store@ answer 401 on a demo that was deployed earlier. Map the old
+# email onto the new one rather than creating a second user: the seeded invoices,
+# orders and audit entries point at the existing user ids.
+LEGACY_DEMO_EMAILS = {
+    "counter@agriflow.local": "billing@agriflow.local",
+    "store@agriflow.local": "inventory@agriflow.local",
+}
+
+# The five roles that same migration retired left their demo users with no role
+# at all — they can still sign in and land on an empty dashboard. Deactivated
+# rather than deleted, because seeded history references them.
+RETIRED_DEMO_EMAILS = [
+    "admin@agriflow.local",
+    "accountant@agriflow.local",
+    "sales@agriflow.local",
+    "technician@agriflow.local",
+    "auditor@agriflow.local",
 ]
 
 # (name, sku, kind, retail, wholesale, mrp, gst%, opening stock, tracks_batches)
@@ -601,6 +624,112 @@ async def _seed_notifications_and_audit(
     await session.commit()
 
 
+async def _find_demo_user(session: AsyncSession, org_id: uuid.UUID, email: str) -> User | None:
+    stmt = select(User).where(User.organization_id == org_id, User.email == email)
+    return (await session.execute(stmt)).scalars().first()
+
+
+async def _reconcile_demo_users(session: AsyncSession) -> list[str]:
+    """Bring the demo logins of an *already seeded* database in line with DEMO_USERS.
+
+    ``seed()`` refuses to touch a database that already holds an organization, so
+    a demo deployed before the roles were renamed keeps serving the old accounts
+    for good: the login page offers counter@/store@ and the API answers 401 for
+    both. This converges them instead, and only ever touches the demo accounts —
+    it creates nothing else and deletes no business data.
+
+    Idempotent: after the first run every check is a no-op, which matters because
+    SEED_ON_START makes this run on every container boot.
+    """
+    org_id = await session.scalar(select(Organization.id).limit(1))
+    if org_id is None:
+        return []
+
+    branch_id = await session.scalar(
+        select(Branch.id)
+        .where(Branch.organization_id == org_id)
+        .order_by(Branch.created_at)
+        .limit(1)
+    )
+    provisioning = OrganizationProvisioningService(session)
+    changes: list[str] = []
+
+    for email, name, role_code in DEMO_USERS:
+        user = await _find_demo_user(session, org_id, email)
+
+        if user is None:
+            legacy_email = LEGACY_DEMO_EMAILS.get(email)
+            legacy = await _find_demo_user(session, org_id, legacy_email) if legacy_email else None
+            if legacy is not None:
+                legacy.email = email
+                legacy.full_name = name
+                user = legacy
+                changes.append(f"renamed {legacy_email} -> {email}")
+            else:
+                user = await provisioning.create_user(
+                    organization_id=org_id,
+                    email=email,
+                    password=DEMO_PASSWORD,
+                    full_name=name,
+                    role_code=role_code,
+                    branch_id=branch_id,
+                )
+                changes.append(f"created {email}")
+
+        # A demo account must be able to sign in and must carry exactly the role
+        # the login page advertises for it — nothing more.
+        if not user.is_active:
+            user.is_active = True
+            changes.append(f"reactivated {email}")
+        if user.locked_until is not None or user.failed_login_count:
+            user.locked_until = None
+            user.failed_login_count = 0
+            changes.append(f"cleared lockout on {email}")
+        if not verify_password(DEMO_PASSWORD, user.hashed_password):
+            user.hashed_password = hash_password(DEMO_PASSWORD)
+            changes.append(f"reset password for {email}")
+
+        role_id = await session.scalar(
+            select(Role.id).where(Role.organization_id == org_id, Role.code == role_code)
+        )
+        if role_id is None:
+            # DEFAULT_ROLES is applied at provisioning time; migration
+            # c9f1a70b34d2 backfills it for older organizations.
+            changes.append(f"WARNING: role {role_code} missing, {email} left unassigned")
+            continue
+        assigned = (
+            (await session.execute(select(UserRole.role_id).where(UserRole.user_id == user.id)))
+            .scalars()
+            .all()
+        )
+        if list(assigned) != [role_id]:
+            await session.execute(
+                delete(UserRole).where(UserRole.user_id == user.id, UserRole.role_id != role_id)
+            )
+            if role_id not in assigned:
+                session.add(UserRole(user_id=user.id, role_id=role_id))
+            changes.append(f"assigned {role_code} to {email}")
+
+        if branch_id is not None:
+            has_branch = await session.scalar(
+                select(UserBranch.branch_id).where(
+                    UserBranch.user_id == user.id, UserBranch.branch_id == branch_id
+                )
+            )
+            if has_branch is None:
+                session.add(UserBranch(user_id=user.id, branch_id=branch_id))
+                changes.append(f"attached {email} to the main branch")
+
+    for email in RETIRED_DEMO_EMAILS:
+        retired = await _find_demo_user(session, org_id, email)
+        if retired is not None and retired.is_active and not retired.is_owner:
+            retired.is_active = False
+            changes.append(f"deactivated retired demo account {email}")
+
+    await session.commit()
+    return changes
+
+
 async def seed(reset: bool = False) -> None:
     settings = get_settings()
     if settings.is_production:
@@ -612,10 +741,18 @@ async def seed(reset: bool = False) -> None:
             await _wipe(session)
         existing = await session.scalar(select(Organization.id).limit(1))
         if existing is not None:
-            print(
-                "This database already contains an organization. "
-                "Re-run with --reset to wipe it and reseed."
-            )
+            # Business data is left alone, but the demo *logins* are still this
+            # script's job — otherwise a long-lived demo keeps offering accounts
+            # that a later role rename left behind.
+            changes = await _reconcile_demo_users(session)
+            print("This database already contains an organization; business data left as is.")
+            if changes:
+                print("Demo logins reconciled:")
+                for change in changes:
+                    print(f"  - {change}")
+            else:
+                print("Demo logins already up to date.")
+            print("Re-run with --reset to wipe everything and reseed from scratch.")
             await get_engine().dispose()
             return
 

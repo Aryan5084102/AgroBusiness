@@ -112,8 +112,14 @@ a user payload, the browser discards the cookie, and the next request 401s.
 `SEED_ON_START=true` runs `python -m app.seed` after migrations, creating the
 demo organization and the one-click sign-in accounts. It requires
 `ENVIRONMENT=staging` — `app/seed.py` refuses to run under `production`.
-**Unset it after the first successful deploy**, otherwise every restart
-re-runs the seed.
+
+On a database that already holds an organization the seed leaves every business
+row alone and only reconciles the demo *logins*: the accounts the login page
+offers are created if missing, renamed from their pre-`c9f1a70b34d2` emails if
+the old ones are still there, unlocked, and re-pointed at the one role each is
+advertised with. That is idempotent, so leaving `SEED_ON_START=true` on a demo
+deployment is safe and is what keeps its sign-in buttons working across a role
+rename. Unset it on any instance holding data you care about.
 
 ## Frontend (Vercel)
 

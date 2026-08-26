@@ -15,7 +15,7 @@ from typing import Any
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 
 from app.core.config import get_settings
 
@@ -30,10 +30,15 @@ def hash_password(plain: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """Verify a password against its Argon2 hash (constant-time inside argon2)."""
+    """Verify a password against its Argon2 hash (constant-time inside argon2).
+
+    A stored value argon2 cannot parse at all — a hash written by an older
+    scheme, or a truncated column — is a failed verification, not an error to
+    raise: it must surface as a 401 rather than a 500 on the login route.
+    """
     try:
         return _password_hasher.verify(hashed, plain)
-    except VerifyMismatchError:
+    except (VerifyMismatchError, InvalidHashError):
         return False
 
 
